@@ -41,15 +41,14 @@ const Apoderado = {
       direccion,
       telefono,
       email,
-      parentesco,
     } = apoderadoData;
 
     try {
       const [result] = await pool.execute(
         `INSERT INTO apoderado (
                     primer_nombre, segundo_nombre, primer_apellido, segundo_apellido, 
-                    dni, direccion, telefono, email, parentesco
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    dni, direccion, telefono, email
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           primer_nombre,
           segundo_nombre,
@@ -59,7 +58,6 @@ const Apoderado = {
           direccion || null,
           telefono,
           email || null,
-          parentesco || null,
         ]
       );
       return { id: result.insertId, ...apoderadoData };
@@ -80,7 +78,6 @@ const Apoderado = {
       direccion,
       telefono,
       email,
-      parentesco,
     } = apoderadoData;
 
     try {
@@ -88,7 +85,7 @@ const Apoderado = {
         `UPDATE apoderado SET 
                     primer_nombre = ?, segundo_nombre = ?, primer_apellido = ?, 
                     segundo_apellido = ?, dni = ?, direccion = ?, 
-                    telefono = ?, email = ?, parentesco = ?
+                    telefono = ?, email = ?
                 WHERE id = ?`,
         [
           primer_nombre,
@@ -98,8 +95,7 @@ const Apoderado = {
           dni,
           direccion || null,
           telefono,
-          email || null,
-          parentesco || null,
+          email || null,  
           id,
         ]
       );
@@ -144,6 +140,48 @@ const Apoderado = {
       }
       throw error;
     }
+  },
+
+  getAssociatedStudents: async (apoderadoId) => {
+    const [rows] = await pool.execute(
+      `
+            SELECT 
+                e.id, e.numero_identificacion AS dni, e.primer_nombre, e.primer_apellido, e.fecha_nacimiento,
+                ea.parentesco
+            FROM estudiantes e
+            JOIN estudiante_apoderado ea ON e.id = ea.estudiante_id
+            WHERE ea.apoderado_id = ?
+            ORDER BY e.primer_apellido
+        `,
+      [apoderadoId]
+    );
+    return rows;
+  },
+
+  // La función associateStudent es la misma que associateApoderado, pero la llamamos distinto por claridad
+  associateStudent: async (apoderadoId, studentId, parentesco) => {
+    try {
+      await pool.execute(
+        `INSERT INTO estudiante_apoderado (estudiante_id, apoderado_id, parentesco) 
+                 VALUES (?, ?, ?)`,
+        [studentId, apoderadoId, parentesco]
+      );
+      return true;
+    } catch (error) {
+      if (error.code === "ER_DUP_ENTRY") {
+        throw new Error("El estudiante ya está asociado a este apoderado.");
+      }
+      throw error;
+    }
+  },
+
+  removeStudentAssociation: async (apoderadoId, studentId) => {
+    const [result] = await pool.execute(
+      `DELETE FROM estudiante_apoderado 
+             WHERE estudiante_id = ? AND apoderado_id = ?`,
+      [studentId, apoderadoId]
+    );
+    return result.affectedRows > 0;
   },
 };
 

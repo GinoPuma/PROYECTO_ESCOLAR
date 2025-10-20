@@ -7,6 +7,8 @@ import {
   Link,
 } from "react-router-dom";
 
+import AssociationManager from "../components/AssociationManager";
+
 const ApoderadoFormPage = () => {
   const [apoderadoData, setApoderadoData] = useState({
     dni: "",
@@ -25,7 +27,9 @@ const ApoderadoFormPage = () => {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const isEditing = !!id;
+  const [refreshAssociations, setRefreshAssociations] = useState(0);
 
+  // Cargar datos al editar o precargar DNI si se envía por URL
   useEffect(() => {
     const initialDni = searchParams.get("dni");
     if (!isEditing && initialDni) {
@@ -40,7 +44,6 @@ const ApoderadoFormPage = () => {
           const response = await api.get(`/apoderados/${id}`);
           setApoderadoData(response.data);
         } catch (err) {
-          console.error("Error fetching apoderado:", err);
           setError("Error al cargar los datos del apoderado.");
         } finally {
           setLoading(false);
@@ -50,12 +53,41 @@ const ApoderadoFormPage = () => {
     }
   }, [id, searchParams, isEditing]);
 
+  // Manejo de cambios de inputs
   const handleChange = (e) => {
     const { name, value } = e.target;
     setApoderadoData({ ...apoderadoData, [name]: value });
     setError("");
   };
 
+  // Eliminar apoderado
+  const handleDelete = async () => {
+    if (
+      !window.confirm(
+        `¿Estás seguro de que deseas eliminar permanentemente al apoderado con DNI ${apoderadoData.dni}? Esta acción es irreversible.`
+      )
+    ) {
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    try {
+      await api.delete(`/apoderados/${id}`);
+      alert(`Apoderado ${apoderadoData.primer_nombre} eliminado exitosamente.`);
+      navigate("/responsables");
+    } catch (err) {
+      const errorMessage =
+        err.response?.data?.message ||
+        "Error al eliminar el apoderado. Revise si está asociado a alguna matrícula.";
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Crear o actualizar apoderado
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -68,24 +100,24 @@ const ApoderadoFormPage = () => {
         segundo_apellido: apoderadoData.segundo_apellido || null,
         email: apoderadoData.email || null,
         direccion: apoderadoData.direccion || null,
-        parentesco: apoderadoData.parentesco || null,
       };
 
       if (isEditing) {
         await api.put(`/apoderados/${id}`, payload);
-        alert(
-          `Apoderado ${apoderadoData.primer_nombre} actualizado correctamente.`
-        );
+        alert(`Apoderado ${apoderadoData.primer_nombre} actualizado.`);
       } else {
-        await api.post("/apoderados", payload);
-        alert(
-          `Apoderado ${apoderadoData.primer_nombre} registrado correctamente.`
-        );
-      }
+        const response = await api.post("/apoderados", payload);
+        const newId = response.data.apoderado.id; 
 
+        alert(
+          `Apoderado ${apoderadoData.primer_nombre} registrado. Ahora puede asociar estudiantes.`
+        ); 
+
+        navigate(`/responsables/edit/${newId}`);
+        return;
+      }
       navigate("/responsables");
     } catch (err) {
-      console.error("Error al guardar apoderado:", err);
       const errorMessage =
         err.response?.data?.message ||
         err.response?.data?.errors?.join(" ") ||
@@ -125,7 +157,6 @@ const ApoderadoFormPage = () => {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* DNI */}
           <div>
             <label className="block text-sm font-medium text-gray-700">
               DNI (*)
@@ -136,10 +167,10 @@ const ApoderadoFormPage = () => {
               value={apoderadoData.dni}
               onChange={handleChange}
               required
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              className="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm"
+              disabled={isEditing}
             />
           </div>
-          {/* Teléfono */}
           <div>
             <label className="block text-sm font-medium text-gray-700">
               Teléfono (*)
@@ -150,13 +181,12 @@ const ApoderadoFormPage = () => {
               value={apoderadoData.telefono}
               onChange={handleChange}
               required
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              className="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm"
             />
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Primer Nombre */}
           <div>
             <label className="block text-sm font-medium text-gray-700">
               Primer Nombre (*)
@@ -167,10 +197,9 @@ const ApoderadoFormPage = () => {
               value={apoderadoData.primer_nombre}
               onChange={handleChange}
               required
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              className="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm"
             />
           </div>
-          {/* Segundo Nombre */}
           <div>
             <label className="block text-sm font-medium text-gray-700">
               Segundo Nombre
@@ -180,10 +209,9 @@ const ApoderadoFormPage = () => {
               name="segundo_nombre"
               value={apoderadoData.segundo_nombre || ""}
               onChange={handleChange}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              className="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm"
             />
           </div>
-          {/* Primer Apellido */}
           <div>
             <label className="block text-sm font-medium text-gray-700">
               Primer Apellido (*)
@@ -194,10 +222,9 @@ const ApoderadoFormPage = () => {
               value={apoderadoData.primer_apellido}
               onChange={handleChange}
               required
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              className="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm"
             />
           </div>
-          {/* Segundo Apellido */}
           <div>
             <label className="block text-sm font-medium text-gray-700">
               Segundo Apellido
@@ -207,12 +234,11 @@ const ApoderadoFormPage = () => {
               name="segundo_apellido"
               value={apoderadoData.segundo_apellido || ""}
               onChange={handleChange}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              className="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm"
             />
           </div>
         </div>
 
-        {/* Dirección y Email */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700">
@@ -223,7 +249,7 @@ const ApoderadoFormPage = () => {
               name="direccion"
               value={apoderadoData.direccion || ""}
               onChange={handleChange}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              className="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm"
             />
           </div>
           <div>
@@ -235,15 +261,17 @@ const ApoderadoFormPage = () => {
               name="email"
               value={apoderadoData.email || ""}
               onChange={handleChange}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              className="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm"
             />
           </div>
         </div>
 
-        <div className="pt-4 text-right">
+        <div className="pt-4 flex justify-between items-center border-t pt-6">
           <button
             type="submit"
-            className="inline-flex justify-center py-2 px-6 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+            className={`inline-flex justify-center py-2 px-6 border border-transparent shadow-sm text-sm font-medium rounded-md text-white 
+                            bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50
+                            ${isEditing ? "" : "w-full"}`}
             disabled={loading}
           >
             {loading
@@ -254,6 +282,15 @@ const ApoderadoFormPage = () => {
           </button>
         </div>
       </form>
+      {isEditing && (
+        <div className="mt-8 border-t pt-6">
+          <AssociationManager
+            entityId={id}
+            entityType="apoderado"
+            onUpdate={() => setRefreshAssociations((prev) => prev + 1)}
+          />
+        </div>
+      )}
     </div>
   );
 };

@@ -2,12 +2,13 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import moment from "moment";
 import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
-import api from "../api/api";
+import api from "../api/api"; // Asegúrate de que este import existe
+// Importación de jspdf-autotable no necesaria si no se usa directamente en el render
+// import autoTable from "jspdf-autotable";
 
 const initialEnrollmentState = {
   estudiante_id: null,
-  apoderado_id: null,
+  apoderado_id: null, // Apoderado Responsable Principal
   periodo_id: null,
   seccion_id: null,
   estado: "Activa",
@@ -30,14 +31,18 @@ const EnrollmentFormPage = () => {
   const [enrollmentData, setEnrollmentData] = useState(initialEnrollmentState);
   const [studentInfo, setStudentInfo] = useState(null);
   const [apoderadoInfo, setApoderadoInfo] = useState(null);
+  const [associatedApoderados, setAssociatedApoderados] = useState([]); // NUEVO: Lista de Apoderados del Estudiante
+
   const [dniSearchStudent, setDniSearchStudent] = useState("");
-  const [dniSearchApoderado, setDniSearchApoderado] = useState("");
+  const [dniSearchApoderado, setDniSearchApoderado] = useState(""); // Usado para búsqueda directa
+
   const [structure, setStructure] = useState({
     niveles: [],
     grados: [],
     secciones: [],
   });
   const [periodos, setPeriodos] = useState([]);
+
   const [costs, setCosts] = useState({
     cuotas: [],
     total_monto: 0,
@@ -45,133 +50,6 @@ const EnrollmentFormPage = () => {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    const fetchInitialData = async () => {
-      setLoading(true);
-      try {
-        const [structureRes, periodosRes] = await Promise.all([
-          api.get("/config/estructura"),
-          api.get("/config/periodos"),
-        ]);
-
-        setStructure(structureRes.data);
-        setPeriodos(periodosRes.data);
-
-        if (isEditing) {
-          const enrollmentRes = await api.get(`/enrollments/${id}`);
-          const data = enrollmentRes.data;
-
-          setEnrollmentData({
-            estudiante_id: data.estudiante_id,
-            apoderado_id: data.apoderado_id,
-            periodo_id: data.periodo_id,
-            seccion_id: data.seccion_id,
-            estado: data.estado,
-          });
-
-          const studentRes = await api.get(`/students/${data.estudiante_id}`);
-          setStudentInfo(studentRes.data);
-          setDniSearchStudent(studentRes.data.numero_identificacion);
-
-          if (data.apoderado_id) {
-            const apoderadoRes = await api.get(
-              `/apoderados/${data.apoderado_id}`
-            );
-            setApoderadoInfo(apoderadoRes.data);
-            setDniSearchApoderado(apoderadoRes.data.dni);
-          }
-
-          calculateCosts(data.periodo_id);
-        }
-      } catch (err) {
-        console.error(err);
-        setError("Error al cargar datos iniciales.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchInitialData();
-  }, [id, isEditing]);
-
-  const calculateCosts = async (periodoId) => {
-    try {
-      const response = await api.post("/enrollments/calculate-costs", {
-        periodo_id: periodoId,
-      });
-      setCosts(response.data);
-    } catch (error) {
-      console.error("Error calculando costos:", error);
-      setCosts({ cuotas: [], total_monto: 0, numero_cuotas: 0 });
-    }
-  };
-
-  useEffect(() => {
-    if (enrollmentData.periodo_id) calculateCosts(enrollmentData.periodo_id);
-  }, [enrollmentData.periodo_id]);
-
-  const handleSearchStudent = async () => {
-    if (!dniSearchStudent.trim()) return;
-    setError("");
-    setLoading(true);
-
-    try {
-      const res = await api.get(`/students/dni/${dniSearchStudent.trim()}`);
-      setStudentInfo(res.data);
-      setEnrollmentData((prev) => ({ ...prev, estudiante_id: res.data.id }));
-    } catch (err) {
-      setStudentInfo(null);
-      setEnrollmentData((prev) => ({ ...prev, estudiante_id: null }));
-
-      if (err.response?.status === 404) {
-        if (
-          window.confirm(
-            `Estudiante con DNI ${dniSearchStudent} no encontrado. ¿Desea registrarlo?`
-          )
-        ) {
-          navigate(`/estudiantes/new?dni=${dniSearchStudent}`);
-        }
-      } else {
-        setError("Error al buscar estudiante.");
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSearchApoderado = async () => {
-    if (!dniSearchApoderado.trim()) {
-      setApoderadoInfo(null);
-      setEnrollmentData((prev) => ({ ...prev, apoderado_id: null }));
-      return;
-    }
-    setError("");
-    setLoading(true);
-
-    try {
-      const res = await api.get(`/apoderados/dni/${dniSearchApoderado.trim()}`);
-      setApoderadoInfo(res.data);
-      setEnrollmentData((prev) => ({ ...prev, apoderado_id: res.data.id }));
-    } catch (err) {
-      setApoderadoInfo(null);
-      setEnrollmentData((prev) => ({ ...prev, apoderado_id: null }));
-
-      if (err.response?.status === 404) {
-        if (
-          window.confirm(
-            `Apoderado con DNI ${dniSearchApoderado} no encontrado. ¿Desea registrarlo?`
-          )
-        ) {
-          navigate(`/responsables/new?dni=${dniSearchApoderado}`);
-        }
-      } else {
-        setError("Error al buscar apoderado.");
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const generateEnrollmentCertificate = async (matriculaId) => {
     try {
@@ -356,6 +234,173 @@ const EnrollmentFormPage = () => {
     }
   };
 
+  // --- Carga Inicial de Data y Edición ---
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      setLoading(true);
+      try {
+        const [structureRes, periodosRes] = await Promise.all([
+          api.get("/config/estructura"),
+          api.get("/config/periodos"),
+        ]);
+        setStructure(structureRes.data);
+        setPeriodos(periodosRes.data);
+
+        if (isEditing) {
+          const enrollmentRes = await api.get(`/enrollments/${id}`);
+          const data = enrollmentRes.data;
+
+          setEnrollmentData({
+            estudiante_id: data.estudiante_id,
+            apoderado_id: data.apoderado_id,
+            periodo_id: data.periodo_id,
+            seccion_id: data.seccion_id,
+            estado: data.estado,
+          });
+
+          const studentRes = await api.get(`/students/${data.estudiante_id}`);
+          setStudentInfo(studentRes.data);
+          setDniSearchStudent(studentRes.data.numero_identificacion);
+
+          // Cargar Apoderados Asociados si estamos en edición
+          await fetchAssociatedApoderados(data.estudiante_id);
+
+          if (data.apoderado_id) {
+            const apoderadoRes = await api.get(
+              `/apoderados/${data.apoderado_id}`
+            );
+            setApoderadoInfo(apoderadoRes.data);
+            setDniSearchApoderado(apoderadoRes.data.dni);
+          }
+
+          calculateCosts(data.periodo_id);
+        }
+      } catch (err) {
+        console.error("Error al cargar data inicial:", err);
+        setError("Error al cargar datos iniciales o matrícula.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchInitialData();
+  }, [id, isEditing]);
+
+  // --- Calcula Costos ---
+  const calculateCosts = async (periodoId) => {
+    try {
+      const response = await api.post("/enrollments/calculate-costs", {
+        periodo_id: periodoId,
+      });
+      setCosts(response.data);
+    } catch (error) {
+      console.error("Error calculando costos:", error);
+      setCosts({ cuotas: [], total_monto: 0, numero_cuotas: 0 });
+    }
+  };
+  useEffect(() => {
+    if (enrollmentData.periodo_id) calculateCosts(enrollmentData.periodo_id);
+  }, [enrollmentData.periodo_id]);
+
+  // --- NUEVA LÓGICA: Obtener Apoderados Asociados al Estudiante ---
+  const fetchAssociatedApoderados = async (studentId) => {
+    try {
+      const res = await api.get(`/students/${studentId}/apoderados`);
+      setAssociatedApoderados(res.data);
+    } catch (err) {
+      setAssociatedApoderados([]);
+    }
+  };
+  // -------------------------------------------------------------------
+
+  const handleSearchStudent = async (e) => {
+    e.preventDefault(); // CORRECCIÓN CRÍTICA: EVITAR RECARGA
+    if (!dniSearchStudent.trim()) return;
+    setError("");
+    setLoading(true);
+    setApoderadoInfo(null); // Limpiar apoderado anterior
+    setAssociatedApoderados([]); // Limpiar lista anterior
+
+    try {
+      const res = await api.get(`/students/dni/${dniSearchStudent.trim()}`);
+      setStudentInfo(res.data);
+      setEnrollmentData((prev) => ({ ...prev, estudiante_id: res.data.id }));
+
+      // 1. Fetch asociados inmediatamente
+      await fetchAssociatedApoderados(res.data.id);
+
+      // 2. Si solo hay uno, autoseleccionarlo como responsable principal
+      if (associatedApoderados.length === 1) {
+        const apoderado = associatedApoderados[0];
+        setApoderadoInfo(apoderado);
+        setEnrollmentData((prev) => ({ ...prev, apoderado_id: apoderado.id }));
+      }
+    } catch (err) {
+      setStudentInfo(null);
+      setEnrollmentData((prev) => ({ ...prev, estudiante_id: null }));
+      if (err.response?.status === 404) {
+        if (
+          window.confirm(
+            `Estudiante con DNI ${dniSearchStudent} no encontrado. ¿Desea registrarlo?`
+          )
+        ) {
+          navigate(`/estudiantes/new?dni=${dniSearchStudent}`);
+        }
+      } else {
+        setError("Error al buscar estudiante.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSearchApoderado = async (e) => {
+    e.preventDefault(); // CORRECCIÓN CRÍTICA: EVITAR RECARGA
+    if (!dniSearchApoderado.trim()) {
+      setApoderadoInfo(null);
+      setEnrollmentData((prev) => ({ ...prev, apoderado_id: null }));
+      return;
+    }
+    setError("");
+    setLoading(true);
+
+    try {
+      const res = await api.get(`/apoderados/dni/${dniSearchApoderado.trim()}`);
+
+      // Si el apoderado no está en la lista de asociados del estudiante (si existe el estudiante)
+      if (studentInfo) {
+        // Validación opcional: ¿Está asociado el apoderado encontrado al estudiante?
+        // Aquí solo se asume que si se busca directamente, se quiere usar ese apoderado.
+      }
+
+      setApoderadoInfo(res.data);
+      setEnrollmentData((prev) => ({ ...prev, apoderado_id: res.data.id }));
+    } catch (err) {
+      setApoderadoInfo(null);
+      setEnrollmentData((prev) => ({ ...prev, apoderado_id: null }));
+      if (err.response?.status === 404) {
+        if (
+          window.confirm(
+            `Apoderado con DNI ${dniSearchApoderado} no encontrado. ¿Desea registrarlo?`
+          )
+        ) {
+          navigate(`/responsables/new?dni=${dniSearchApoderado}`);
+        }
+      } else {
+        setError("Error al buscar apoderado.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Función para seleccionar un apoderado de la lista de asociados
+  const handleSelectAssociatedApoderado = (apoderado) => {
+    setApoderadoInfo(apoderado);
+    setEnrollmentData((prev) => ({ ...prev, apoderado_id: apoderado.id }));
+    setDniSearchApoderado(apoderado.dni); // Para que se muestre en la barra de búsqueda si volvemos a mostrarla
+  };
+
+  // --- Lógica de Submit ---
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (
@@ -366,8 +411,9 @@ const EnrollmentFormPage = () => {
       setError("Complete la información obligatoria antes de guardar.");
       return;
     }
-
     setLoading(true);
+    setError("");
+
     try {
       const payload = {
         ...enrollmentData,
@@ -384,12 +430,11 @@ const EnrollmentFormPage = () => {
         matriculaId = response.data.enrollment.id;
         alert("Matrícula creada exitosamente.");
 
-        // Preguntar si desea generar constancia
+        // Generar constancia PDF
         if (window.confirm("¿Desea generar la constancia de matrícula?")) {
           await generateEnrollmentCertificate(matriculaId);
         }
       }
-
       navigate("/matriculas");
     } catch (err) {
       console.error(err);
@@ -399,6 +444,7 @@ const EnrollmentFormPage = () => {
     }
   };
 
+  // --- Filtros ---
   const getGradoOptions = useMemo(() => {
     return structure.grados.map((g) => ({
       ...g,
@@ -412,6 +458,8 @@ const EnrollmentFormPage = () => {
     enrollmentData.estudiante_id &&
     enrollmentData.periodo_id &&
     enrollmentData.seccion_id;
+
+  const DNI_SEARCH_DISABLED = loading || (isEditing && studentInfo); // Deshabilita la búsqueda si estamos editando o ya encontramos el estudiante
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 p-8">
@@ -443,7 +491,7 @@ const EnrollmentFormPage = () => {
 
           <form onSubmit={handleSubmit} className="space-y-8">
             <div className="grid lg:grid-cols-3 gap-6">
-              {/* ESTUDIANTE */}
+              {/* BLOQUE 1: ESTUDIANTE */}
               <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 shadow-md border border-indigo-100">
                 <div className="flex items-center gap-3 mb-5">
                   <div className="bg-indigo-600 text-white w-10 h-10 rounded-full flex items-center justify-center text-xl">
@@ -453,7 +501,6 @@ const EnrollmentFormPage = () => {
                     Estudiante
                   </h3>
                 </div>
-
                 <div className="space-y-3">
                   <div className="flex gap-2">
                     <input
@@ -463,13 +510,13 @@ const EnrollmentFormPage = () => {
                       onChange={(e) => setDniSearchStudent(e.target.value)}
                       className="flex-grow px-4 py-2 border-2 border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
                       required
-                      disabled={isEditing || loading}
+                      disabled={DNI_SEARCH_DISABLED}
                     />
                     <button
                       type="button"
                       onClick={handleSearchStudent}
                       className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition shadow-md disabled:opacity-50"
-                      disabled={loading || isEditing}
+                      disabled={DNI_SEARCH_DISABLED}
                     >
                       🔍
                     </button>
@@ -496,69 +543,109 @@ const EnrollmentFormPage = () => {
                   ) : (
                     <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800">
                       <p className="flex items-center gap-2">
-                        <span>⚠️</span>
-                        Busque al estudiante por DNI
+                        <span>⚠️</span> Busque al estudiante por DNI
                       </p>
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* APODERADO */}
+              {/* BLOQUE 2: APODERADO */}
               <div className="bg-gradient-to-br from-teal-50 to-cyan-50 rounded-2xl p-6 shadow-md border border-teal-100">
                 <div className="flex items-center gap-3 mb-5">
                   <div className="bg-teal-600 text-white w-10 h-10 rounded-full flex items-center justify-center text-xl">
                     👨‍👩‍👧
                   </div>
-                  <h3 className="text-xl font-bold text-teal-900">Apoderado</h3>
+                  <h3 className="text-xl font-bold text-teal-900">
+                    Apoderado (Responsable Principal)
+                  </h3>
                 </div>
 
-                <div className="space-y-3">
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="DNI del Apoderado (Opcional)"
-                      value={dniSearchApoderado}
-                      onChange={(e) => setDniSearchApoderado(e.target.value)}
-                      className="flex-grow px-4 py-2 border-2 border-teal-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent transition"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleSearchApoderado}
-                      className="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition shadow-md disabled:opacity-50"
-                      disabled={loading}
-                    >
-                      🔍
-                    </button>
-                  </div>
+                {studentInfo ? (
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-semibold text-gray-700">
+                      Seleccionar de Asociados ({associatedApoderados.length})
+                    </h4>
 
-                  {apoderadoInfo ? (
-                    <div className="bg-white rounded-xl p-4 shadow-sm border-2 border-green-200">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-2xl">✅</span>
-                        <p className="font-bold text-gray-800">
-                          {getFullName(apoderadoInfo)}
+                    {/* Selector de Apoderados Asociados */}
+                    <select
+                      className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 transition"
+                      value={apoderadoInfo?.id || ""}
+                      onChange={(e) => {
+                        const selectedId = parseInt(e.target.value);
+                        const selectedApoderado =
+                          associatedApoderados.find(
+                            (a) => a.id === selectedId
+                          ) || null;
+                        handleSelectAssociatedApoderado(selectedApoderado);
+                      }}
+                      required={!apoderadoInfo} // Requerir si no hay uno seleccionado
+                    >
+                      <option value="" disabled hidden>
+                        -- Seleccione Apoderado --
+                      </option>
+                      {associatedApoderados.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {getFullName(a)} ({a.parentesco})
+                        </option>
+                      ))}
+                    </select>
+
+                    {/* Opción de búsqueda directa por DNI (si no hay asociados o si el usuario elige 'OTRO') */}
+                    {apoderadoInfo?.id === "OTRO" ||
+                      (associatedApoderados.length === 0 && (
+                        <div className="pt-2 border-t border-gray-200">
+                          <p className="text-xs text-gray-500 mb-1">
+                            Búsqueda Directa:
+                          </p>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              placeholder="DNI Apoderado"
+                              value={dniSearchApoderado}
+                              onChange={(e) =>
+                                setDniSearchApoderado(e.target.value)
+                              }
+                              className="flex-grow px-4 py-2 border-2 border-teal-200 rounded-lg focus:ring-2 focus:ring-teal-500 transition"
+                            />
+                            <button
+                              type="button"
+                              onClick={handleSearchApoderado}
+                              className="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 disabled:opacity-50"
+                              disabled={loading}
+                            >
+                              🔍
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+
+                    {/* Tarjeta de Apoderado Seleccionado */}
+                    {apoderadoInfo && (
+                      <div className="bg-white rounded-xl p-4 shadow-sm border-2 border-green-200">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-2xl">✅</span>
+                          <p className="font-bold text-gray-800">
+                            {getFullName(apoderadoInfo)}
+                          </p>
+                        </div>
+                        <p className="text-sm text-gray-600">
+                          📋 DNI: {apoderadoInfo.dni}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          📞 Tel: {apoderadoInfo.telefono}
                         </p>
                       </div>
-                      <p className="text-sm text-gray-600">
-                        📋 DNI: {apoderadoInfo.dni}
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        📞 Tel: {apoderadoInfo.telefono}
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm text-gray-600">
-                      <p className="flex items-center gap-2">
-                        <span>ℹ️</span>
-                        Buscar Apoderado por DNI
-                      </p>
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm text-gray-600">
+                    <p>ℹ️ Debe seleccionar un estudiante primero.</p>
+                  </div>
+                )}
               </div>
 
-              {/* MATRÍCULA */}
+              {/* BLOQUE 3: MATRÍCULA */}
               <div
                 className={`rounded-2xl p-6 shadow-md border-2 transition ${
                   enrollmentReady
@@ -597,7 +684,7 @@ const EnrollmentFormPage = () => {
                           periodo_id: parseInt(e.target.value),
                         }))
                       }
-                      className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition"
+                      className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 transition"
                       required
                     >
                       <option value="">Seleccione Periodo</option>
@@ -610,7 +697,6 @@ const EnrollmentFormPage = () => {
                         ))}
                     </select>
                   </div>
-
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
                       Grado y Sección *
@@ -624,7 +710,7 @@ const EnrollmentFormPage = () => {
                           seccion_id: parseInt(e.target.value),
                         }))
                       }
-                      className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition"
+                      className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 transition"
                       required
                     >
                       <option value="">Seleccione</option>
@@ -656,10 +742,11 @@ const EnrollmentFormPage = () => {
                             estado: e.target.value,
                           }))
                         }
-                        className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition"
+                        className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 transition"
                       >
                         <option value="Activa">Activa</option>
                         <option value="Inactiva">Inactiva</option>
+                        <option value="Pendiente">Pendiente</option>
                       </select>
                     </div>
                   )}
@@ -667,8 +754,7 @@ const EnrollmentFormPage = () => {
                   {enrollmentData.periodo_id && (
                     <div className="mt-4 p-4 bg-white rounded-xl border-2 border-green-200 shadow-sm">
                       <p className="font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                        <span className="text-xl">💰</span>
-                        Costos del Periodo:
+                        <span className="text-xl">💰</span> Costos del Periodo:
                       </p>
                       <div className="space-y-1 text-sm">
                         <p className="flex justify-between">
@@ -706,12 +792,10 @@ const EnrollmentFormPage = () => {
               >
                 {loading ? (
                   <>
-                    <span className="animate-spin">⏳</span>
-                    Procesando...
+                    <span className="animate-spin">⏳</span>Procesando...
                   </>
                 ) : (
                   <>
-                    <span>✓</span>
                     {isEditing ? "Actualizar Matrícula" : "Confirmar Matrícula"}
                   </>
                 )}

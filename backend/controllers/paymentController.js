@@ -170,6 +170,20 @@ exports.registerPayment = async (req, res) => {
           "La cuota seleccionada no pertenece a este período o matrícula.",
       });
     }
+    const hasPriorUnpaidCuota = calculatedSummary.cuotas.some(
+      (c) =>
+        // 1. Está totalmente pendiente (no se ha abonado nada)
+        c.saldoPendiente === parseFloat(c.monto_obligatorio) &&
+        // 2. Su fecha límite es estrictamente anterior a la cuota que queremos pagar
+        new Date(c.fecha_limite) < new Date(targetCuota.fecha_limite)
+    );
+
+    if (hasPriorUnpaidCuota) {
+      return res.status(409).json({
+        message:
+          "Debe pagar primero la cuota más antigua (con fecha límite anterior) antes de continuar.",
+      });
+    }
 
     const montoFloat = parseFloat(monto);
 

@@ -94,7 +94,6 @@ exports.createApoderado = async (req, res) => {
 };
 
 exports.updateApoderado = async (req, res) => {
-  // <-- Función renombrada
   const apoderadoId = req.params.id;
   const apoderadoData = req.body;
 
@@ -151,5 +150,56 @@ exports.deleteApoderado = async (req, res) => {
       return res.status(409).json({ message: error.message });
     }
     res.status(500).json({ message: "Error al eliminar el apoderado." });
+  }
+};
+
+exports.getAssociatedStudents = async (req, res) => {
+  try {
+    const apoderados = await Apoderado.getAssociatedStudents(req.params.id);
+    res.json(apoderados);
+  } catch (error) {
+    console.error("Error al obtener apoderados asociados:", error);
+    res
+      .status(500)
+      .json({ message: "Error al obtener lista de apoderados asociados." });
+  }
+};
+
+exports.associateStudent = async (req, res) => {
+  const apoderadoId = req.params.id;
+  const { student_id, parentesco } = req.body;
+
+  if (!student_id || !parentesco) {
+    return res
+      .status(400)
+      .json({ message: "Se requiere student_id y parentesco." });
+  }
+
+  try {
+    await Apoderado.associateStudent(apoderadoId, student_id, parentesco);
+    res.status(201).json({ message: "Estudiante asociado exitosamente." });
+  } catch (error) {
+    if (error.message.includes("ya está asociado")) {
+      return res.status(409).json({ message: error.message });
+    }
+    res.status(500).json({ message: "Error al asociar estudiante." });
+  }
+};
+
+exports.removeStudentAssociation = async (req, res) => {
+  const apoderadoId = req.params.id;
+  const { studentId } = req.params;
+
+  try {
+    const success = await Apoderado.removeStudentAssociation(
+      apoderadoId,
+      studentId
+    );
+    if (!success) {
+      return res.status(404).json({ message: "Asociación no encontrada." });
+    }
+    res.json({ message: "Asociación eliminada exitosamente." });
+  } catch (error) {
+    res.status(500).json({ message: "Error al eliminar asociación." });
   }
 };

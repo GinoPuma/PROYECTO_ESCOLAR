@@ -149,6 +149,24 @@ const Enrollment = {
       throw error;
     }
   },
+  existsByStudentAndPeriod: async (
+    student_id,
+    periodo_id,
+    currentEnrollmentId = null
+  ) => {
+    let query =
+      "SELECT id FROM matriculas WHERE estudiante_id = ? AND periodo_id = ?";
+    const params = [student_id, periodo_id];
+
+    // Excluir la matrícula actual si estamos en modo edición (UPDATE)
+    if (currentEnrollmentId) {
+      query += " AND id != ?";
+      params.push(currentEnrollmentId);
+    }
+
+    const [rows] = await pool.execute(query, params);
+    return rows.length > 0; // True si se encuentra una coincidencia
+  },
 };
 
 module.exports = Enrollment;

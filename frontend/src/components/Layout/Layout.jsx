@@ -28,7 +28,7 @@ const Layout = () => {
   if (user && user.rol === "Administrador") {
     sidebarItems.push(
       { to: "/admin/users", label: "Gestión Usuarios", icon: "👥" },
-      { to: "/reportes", label: "Reportes", icon: "📊" }, 
+      /* { to: "/reportes", label: "Reportes", icon: "📊" },  */
       { to: "/configuracion", label: "Configuración", icon: "⚙️" }
     );
   }

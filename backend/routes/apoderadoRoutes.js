@@ -52,4 +52,23 @@ router.delete(
   authorize(...rolesPermitidos),
   apoderadoController.deleteApoderado
 );
+router.get(
+  "/:id/estudiantes",
+  protect,
+  authorize(...rolesPermitidos),
+  apoderadoController.getAssociatedStudents
+);
+router.post(
+  "/:id/estudiantes",
+  protect,
+  authorize(...rolesPermitidos),
+  apoderadoController.associateStudent
+);
+router.delete(
+  "/:id/estudiantes/:studentId",
+  protect,
+  authorize(...rolesPermitidos),
+  apoderadoController.removeStudentAssociation
+);
+
 module.exports = router;

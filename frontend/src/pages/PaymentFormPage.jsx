@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import api from "../api/api";
 import { useParams, useNavigate } from "react-router-dom";
 import moment from "moment";
@@ -23,6 +23,36 @@ const PaymentFormPage = () => {
   const [error, setError] = useState("");
   const [submitLoading, setSubmitLoading] = useState(false);
 
+  const nextCuotaToPay = useMemo(() => {
+    if (!summary || summary.cuotas.length === 0) return null;
+
+    // Filtramos las cuotas que tienen saldo pendiente > 0
+    const pendingCuotas = summary.cuotas.filter((c) => c.saldoPendiente > 0);
+
+    // Si no hay cuotas pendientes, terminamos
+    if (pendingCuotas.length === 0) return null;
+
+    // Ordenamos todas las cuotas pendientes por fecha_limite ascendente (la más antigua primero)
+    pendingCuotas.sort(
+      (a, b) => new Date(a.fecha_limite) - new Date(b.fecha_limite)
+    );
+
+    // Identificamos las cuotas que están TOTALMENTE pendientes (las que tienen el saldo igual al monto obligatorio)
+    const fullyPendingCuotas = pendingCuotas.filter(
+      (c) => c.saldoPendiente === parseFloat(c.monto_obligatorio)
+    );
+
+    if (fullyPendingCuotas.length > 0) {
+      // Si hay cuotas totalmente pendientes, la más antigua de ellas es la que bloquea.
+      fullyPendingCuotas.sort(
+        (a, b) => new Date(a.fecha_limite) - new Date(b.fecha_limite)
+      );
+      return fullyPendingCuotas[0];
+    } else {
+      return pendingCuotas[0];
+    }
+  }, [summary]);
+
   // Cargar resumen y métodos
   useEffect(() => {
     const fetchData = async () => {
@@ -37,25 +67,7 @@ const PaymentFormPage = () => {
         setSummary(summaryRes.data);
         setPaymentMethods(methodsRes.data);
 
-        const firstPendingCuota = summaryRes.data.cuotas.find(
-          (c) => c.estadoCuota !== "Pagado"
-        );
-
-        if (firstPendingCuota) {
-          setPaymentData((prev) => ({
-            ...prev,
-            cuota_id: firstPendingCuota.cuota_id,
-            monto: firstPendingCuota.saldoPendiente.toFixed(2),
-          }));
-        } else if (summaryRes.data.cuotas.length > 0) {
-          setPaymentData((prev) => ({
-            ...prev,
-            cuota_id:
-              summaryRes.data.cuotas[summaryRes.data.cuotas.length - 1]
-                .cuota_id,
-            monto: "0.00",
-          }));
-        }
+        // LA LÓGICA DE AUTOSELECCIÓN SE MOVIÓ ABAJO para usar nextCuotaToPay
       } catch (err) {
         console.error("Error fetching payment data:", err);
         setError(
@@ -67,6 +79,23 @@ const PaymentFormPage = () => {
     };
     fetchData();
   }, [matriculaId]);
+  useEffect(() => {
+    if (summary && nextCuotaToPay) {
+      // Autoseleccionar la cuota que debe pagarse primero
+      setPaymentData((prev) => ({
+        ...prev,
+        cuota_id: nextCuotaToPay.cuota_id,
+        monto: nextCuotaToPay.saldoPendiente.toFixed(2),
+      }));
+    } else if (summary && summary.cuotas.length > 0) {
+      // Si no hay pendientes, seleccionar la última con monto 0.00
+      setPaymentData((prev) => ({
+        ...prev,
+        cuota_id: summary.cuotas[summary.cuotas.length - 1].cuota_id,
+        monto: "0.00",
+      }));
+    }
+  }, [summary, nextCuotaToPay]);
 
   const handlePaymentDataChange = (e) => {
     const { name, value } = e.target;
@@ -190,12 +219,14 @@ const PaymentFormPage = () => {
       );
       doc.text(`DNI: ${data.summary.est_dni}`, 15, 75);
       doc.text(`Periodo Académico: ${data.summary.periodo_nombre}`, 15, 81);
+      doc.text(`Nivel: ${data.summary.nivel_nombre}`, 15, 87);
       doc.text(
         `Grado/Sección: ${data.summary.grado_nombre} - ${data.summary.seccion_nombre}`,
         15,
-        87
+        93
       );
-      doc.text(`Matrícula N°: ${data.matricula_id}`, 15, 93);
+
+      doc.text(`Matrícula N°: ${data.matricula_id}`, 15, 99);
 
       // Información del pago
       doc.setFont("helvetica", "bold");
@@ -267,16 +298,161 @@ const PaymentFormPage = () => {
     }
   };
 
-  // Ver pagos de una cuota específica
-  const viewCuotaPayments = async (cuotaId) => {
-    try {
-      const response = await api.get(`/pagos/cuota/${cuotaId}`);
-      setSelectedCuotaPayments(response.data);
-      setShowPaymentsModal(true);
-    } catch (err) {
-      console.error("Error al obtener pagos:", err);
-      alert("Error al cargar los pagos de la cuota.");
-    }
+  const generateFullStatement = () => {
+    if (!summary) return;
+
+    const doc = new jsPDF();
+    let y = 15;
+    const pageWidth = doc.internal.pageSize.width;
+
+    // --- 1. ENCABEZADO DE LA INSTITUCIÓN ---
+
+    // Nombre de la Institución
+    doc.setFontSize(18);
+    doc.setFont("helvetica", "bold");
+    doc.text(
+      summary.institucion_nombre || "INSTITUCIÓN EDUCATIVA",
+      pageWidth / 2,
+      y,
+      { align: "center" }
+    );
+    y += 8;
+
+    // Título del Documento
+    doc.setFontSize(12);
+    doc.text("ESTADO DE CUENTA ACADÉMICO", pageWidth / 2, y, {
+      align: "center",
+    });
+    y += 7;
+
+    // Dirección y Contacto
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+
+    const contactLine = `${summary.institucion_direccion || ""} | Tel: ${
+      summary.institucion_telefono || ""
+    } | Email: ${summary.institucion_email || ""}`;
+    doc.text(contactLine, pageWidth / 2, y, { align: "center" });
+    y += 5;
+
+    // Separador
+    doc.setDrawColor(150, 150, 150);
+    doc.line(15, y, pageWidth - 15, y);
+    y += 7;
+    // ----------------------------------------
+
+    // --- 2. Información del Estudiante y Matrícula ---
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("DATOS DE LA MATRÍCULA", 15, y);
+    y += 5;
+
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+
+    const estData = [
+      [
+        "Estudiante:",
+        `${summary.est_nombre} ${summary.est_apellido} (DNI: ${summary.est_dni})`,
+      ],
+      [
+        "Apoderado:",
+        summary.apoderado_nombre
+          ? `${summary.apoderado_nombre} ${summary.apoderado_apellido}`
+          : "N/A",
+      ],
+      ["Periodo:", summary.periodo_nombre],
+      ["Nivel:", summary.nivel_nombre],
+      ["Grado/Sección:", `${summary.grado_nombre} / ${summary.seccion_nombre}`],
+      ["Matrícula ID:", `#${summary.matricula_id}`],
+    ];
+
+    // Usamos autoTable para la sección de información
+    autoTable(doc, {
+      startY: y + 5,
+      head: [], // Sin encabezado visible
+      body: estData,
+      theme: "plain",
+      styles: { fontSize: 10, cellPadding: 1, overflow: "linebreak" },
+      columnStyles: { 0: { fontStyle: "bold", cellWidth: 30 } },
+    });
+
+    y = doc.lastAutoTable.finalY + 10;
+
+    // --- 3. Resumen Financiero Global ---
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("RESUMEN FINANCIERO TOTAL", 15, y);
+    y += 5;
+
+    const resumenBody = [
+      ["Obligación Total:", `S/ ${summary.totalObligation.toFixed(2)}`, ""],
+      ["Total Pagado:", `S/ ${summary.totalPaid.toFixed(2)}`, ""],
+      ["SALDO PENDIENTE:", `S/ ${summary.totalPending.toFixed(2)}`, ""],
+    ];
+
+    autoTable(doc, {
+      startY: y + 5,
+      head: [],
+      body: resumenBody,
+      theme: "striped",
+      styles: { fontSize: 10, cellPadding: 2 },
+      headStyles: { fillColor: [100, 100, 200] },
+      columnStyles: { 0: { fontStyle: "bold", cellWidth: 40 } },
+    });
+
+    y = doc.lastAutoTable.finalY + 10;
+
+    // --- 4. Detalle de Cuotas ---
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("DETALLE DE PAGOS POR CUOTA", 15, y);
+    y += 5;
+
+    const cuotasHead = [
+      [
+        "#",
+        "Concepto",
+        "Obligación",
+        "Pagado",
+        "SALDO PENDIENTE",
+        "F. Límite",
+        "Estado",
+      ],
+    ];
+    const cuotasBody = summary.cuotas.map((c) => [
+      c.orden || "-",
+      c.concepto,
+      `S/ ${c.monto_obligatorio}`,
+      `S/ ${c.montoPagado.toFixed(2)}`,
+      `S/ ${c.saldoPendiente.toFixed(2)}`,
+      moment(c.fecha_limite).format("DD/MM/YYYY"),
+      c.estadoCuota,
+    ]);
+
+    autoTable(doc, {
+      startY: y + 5,
+      head: cuotasHead,
+      body: cuotasBody,
+      theme: "grid",
+      styles: { fontSize: 8, cellPadding: 1.5 },
+      headStyles: { fillColor: [79, 70, 229] },
+      columnStyles: { 4: { fontStyle: "bold", textColor: [255, 0, 0] } },
+    });
+
+    // Pie de página
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "italic");
+    doc.text(
+      `Generado el: ${moment().format("DD/MM/YYYY HH:mm")}`,
+      pageWidth / 2,
+      doc.internal.pageSize.height - 10,
+      { align: "center" }
+    );
+
+    // Guardar y descargar
+    const filename = `EstadoCuenta_${summary.est_apellido}_M${summary.matricula_id}.pdf`;
+    doc.save(filename);
   };
 
   // Ver todos los pagos de la matrícula
@@ -310,12 +486,19 @@ const PaymentFormPage = () => {
           {summary.est_nombre} {summary.est_apellido}
         </span>{" "}
         | Periodo:{" "}
-        <span className="font-semibold">{summary.periodo_nombre}</span> | Grado:{" "}
+        <span className="font-semibold">{summary.periodo_nombre}</span> | Nivel:{" "}
+        <span className="font-semibold">{summary.nivel_nombre}</span> | Grado:{" "}
         <span className="font-semibold">
           {summary.grado_nombre} / {summary.seccion_nombre}
         </span>
       </p>
-
+      <button
+        onClick={generateFullStatement}
+        className="bg-red-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-700 transition flex items-center gap-2"
+      >
+        <span className="text-xl">⬇️</span>
+        Descargar Estado de Cuenta
+      </button>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         {/* Resumen General */}
         <div className="lg:col-span-2 space-y-4">
@@ -401,15 +584,15 @@ const PaymentFormPage = () => {
                           {c.estadoCuota}
                         </span>
                       </td>
-                      <td className="px-3 py-2 text-center" >
+                      <td className="px-3 py-2 text-center">
                         {c.montoPagado > 0 && (
                           <button
-                          onClick={() => viewAllPayments()}
-                          className="text-red-600 hover:text-red-900 font-medium transition"
-                          title="ver pagos de la matrícula"
-                        >
-                          📄
-                        </button>
+                            onClick={() => viewAllPayments()}
+                            className="text-red-600 hover:text-red-900 font-medium transition"
+                            title="ver pagos de la matrícula"
+                          >
+                            📄
+                          </button>
                         )}
                       </td>
                     </tr>
@@ -438,6 +621,18 @@ const PaymentFormPage = () => {
               <label className="block text-sm font-medium text-gray-700">
                 Cuota a Pagar (*)
               </label>
+              {/* ADVERTENCIA VISUAL si la cuota seleccionada no es la correcta */}
+              {targetCuota &&
+                nextCuotaToPay &&
+                new Date(targetCuota.fecha_limite) >
+                  new Date(nextCuotaToPay.fecha_limite) &&
+                targetCuota.saldoPendiente ===
+                  targetCuota.monto_obligatorio && (
+                  <p className="text-sm text-red-600 mb-1 font-semibold">
+                    ⚠️ Debe pagar primero: {nextCuotaToPay.concepto}
+                  </p>
+                )}
+
               <select
                 name="cuota_id"
                 value={paymentData.cuota_id}
@@ -447,8 +642,31 @@ const PaymentFormPage = () => {
               >
                 <option value="">Seleccione Cuota</option>
                 {summary.cuotas.map((c) => (
-                  <option key={c.cuota_id} value={c.cuota_id}>
+                  <option
+                    key={c.cuota_id}
+                    value={c.cuota_id}
+                    // LÓGICA DE BLOQUEO: Deshabilitar si existe una cuota más antigua TOTALMENTE pendiente
+                    disabled={
+                      nextCuotaToPay &&
+                      // No bloquea la cuota que está totalmente pendiente si es la más antigua
+                      nextCuotaToPay.cuota_id !== c.cuota_id &&
+                      // Y si la cuota actual está totalmente pendiente (evita pagar por adelantado)
+                      nextCuotaToPay.saldoPendiente ===
+                        parseFloat(nextCuotaToPay.monto_obligatorio) &&
+                      // Y si la cuota que queremos seleccionar es más nueva que la que bloquea
+                      new Date(c.fecha_limite) >
+                        new Date(nextCuotaToPay.fecha_limite)
+                    }
+                  >
                     {c.concepto} (Saldo: S/ {c.saldoPendiente.toFixed(2)})
+                    {/* Texto de bloqueo para UX */}
+                    {nextCuotaToPay &&
+                      nextCuotaToPay.cuota_id !== c.cuota_id &&
+                      nextCuotaToPay.saldoPendiente ===
+                        parseFloat(nextCuotaToPay.monto_obligatorio) &&
+                      new Date(c.fecha_limite) >
+                        new Date(nextCuotaToPay.fecha_limite) &&
+                      " (Bloqueada)"}
                   </option>
                 ))}
               </select>

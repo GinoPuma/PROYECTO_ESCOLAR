@@ -1,7 +1,7 @@
 const pool = require("../config/db");
 
 const Payment = {
-  // 1️⃣ Obtiene los métodos de pago
+  // Obtiene los métodos de pago
   getPaymentMethods: async () => {
     const [rows] = await pool.execute(
       "SELECT id, nombre FROM metodos_pago ORDER BY nombre"
@@ -9,7 +9,7 @@ const Payment = {
     return rows;
   },
 
-  // 2️⃣ Obtiene los pagos registrados para una cuota
+  // Obtiene los pagos registrados para una cuota
   getPaymentsForCuota: async (cuotaId) => {
     const [rows] = await pool.execute(
       `
@@ -30,7 +30,7 @@ const Payment = {
     return rows;
   },
 
-  // 2B️⃣ Obtiene un pago específico por ID
+  // Obtiene un pago específico por ID
   getPaymentById: async (pagoId) => {
     const [rows] = await pool.execute(
       `
@@ -56,9 +56,9 @@ const Payment = {
     return rows[0] || null;
   },
 
-  // 3️⃣ Obtiene el resumen financiero de una matrícula (Cuotas vs Pagos)
+  // Obtiene el resumen financiero de una matrícula (Cuotas vs Pagos)
   getFinancialSummary: async (matriculaId) => {
-    // Obtener la información de matrícula y estudiante CON DATOS DE INSTITUCIÓN
+    
     const [matriculaRows] = await pool.execute(
       `
       SELECT 
@@ -76,6 +76,7 @@ const Payment = {
         p.nombre AS periodo_nombre,
         g.nombre AS grado_nombre,
         s.nombre AS seccion_nombre,
+        n.nombre AS nivel_nombre,
         i.nombre AS institucion_nombre,
         i.direccion AS institucion_direccion,
         i.telefono AS institucion_telefono,
@@ -86,6 +87,7 @@ const Payment = {
       JOIN periodos p ON m.periodo_id = p.id
       JOIN secciones s ON m.seccion_id = s.id
       JOIN grados g ON s.grado_id = g.id
+      JOIN niveles_educativos n ON g.nivel_id = n.id
       LEFT JOIN institucion i ON i.id = 1
       WHERE m.id = ?
     `,

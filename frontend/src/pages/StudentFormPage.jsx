@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import api from "../api/api";
 import {
   useNavigate,
@@ -6,6 +6,7 @@ import {
   useSearchParams,
   Link,
 } from "react-router-dom";
+import AssociationManager from "../components/AssociationManager";
 
 const StudentFormPage = () => {
   const [studentData, setStudentData] = useState({
@@ -23,6 +24,7 @@ const StudentFormPage = () => {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const isEditing = !!id;
+  const [refreshAssociations, setRefreshAssociations] = useState(0);
 
   useEffect(() => {
     // Si viene un DNI desde la búsqueda
@@ -59,6 +61,39 @@ const StudentFormPage = () => {
     }
   }, [id, searchParams, isEditing]);
 
+  const validationStatus = useMemo(() => {
+    if (!studentData.fecha_nacimiento) {
+      return { valid: true, message: null };
+    }
+
+    const birthDate = new Date(studentData.fecha_nacimiento);
+    const today = new Date();
+    const maxAge = 18;
+
+    // 1. Check Fecha Futura
+    if (birthDate > today) {
+      return {
+        valid: false,
+        message: "La fecha de nacimiento no puede ser futura.",
+      };
+    }
+
+    // 2. Check Edad Máxima
+    const limitDate = new Date(
+      today.getFullYear() - maxAge,
+      today.getMonth(),
+      today.getDate()
+    );
+    if (birthDate < limitDate) {
+      return {
+        valid: false,
+        message: `El estudiante no debe ser mayor de ${maxAge} años.`,
+      };
+    }
+
+    return { valid: true, message: null };
+  }, [studentData.fecha_nacimiento]);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setStudentData((prev) => ({ ...prev, [name]: value }));
@@ -81,8 +116,14 @@ const StudentFormPage = () => {
         await api.put(`/students/${id}`, studentPayload);
         alert(`Estudiante ${studentData.primer_nombre} actualizado.`);
       } else {
-        await api.post("/students", studentPayload);
-        alert(`Estudiante ${studentData.primer_nombre} creado.`);
+        const response = await api.post("/students", studentPayload);
+        const newId = response.data.student.id;
+
+        alert(
+          `Estudiante ${studentData.primer_nombre} creado exitosamente. Ahora puede asociar apoderados.`
+        );
+        navigate(`/estudiantes/edit/${newId}`);
+        return;
       }
 
       navigate("/estudiantes");
@@ -123,6 +164,17 @@ const StudentFormPage = () => {
         >
           <strong className="font-bold">¡Error!</strong>
           <span className="block sm:inline ml-2">{error}</span>
+        </div>
+      )}
+      {!validationStatus.valid && (
+        <div
+          className="bg-yellow-100 border border-yellow-400 text-yellow-800 px-4 py-3 rounded relative mb-4"
+          role="alert"
+        >
+          <strong className="font-bold">Advertencia de Fecha:</strong>
+          <span className="block sm:inline ml-2">
+            {validationStatus.message}
+          </span>
         </div>
       )}
 
@@ -250,6 +302,15 @@ const StudentFormPage = () => {
           </button>
         </div>
       </form>
+      {isEditing && (
+        <div className="mt-8 border-t pt-6">
+          <AssociationManager
+            entityId={id}
+            entityType="student"
+            onUpdate={() => setRefreshAssociations((prev) => prev + 1)}
+          />
+        </div>
+      )}
     </div>
   );
 };

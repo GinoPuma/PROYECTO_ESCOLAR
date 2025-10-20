@@ -6,6 +6,28 @@ const validateStudentData = (data) => {
   if (!data.primer_apellido) errors.push("El primer apellido es obligatorio.");
   if (!data.fecha_nacimiento)
     errors.push("La fecha de nacimiento es obligatoria.");
+  if (data.fecha_nacimiento) {
+    const birthDate = new Date(data.fecha_nacimiento);
+    const today = new Date();
+
+    // 1. VALIDACIÓN: No puede ser una fecha futura
+    if (birthDate > today) {
+      errors.push("La fecha de nacimiento no puede ser futura.");
+    }
+
+    const maxAge = 18;
+    const limitDate = new Date(
+      today.getFullYear() - maxAge,
+      today.getMonth(),
+      today.getDate()
+    );
+
+    if (birthDate < limitDate) {
+      errors.push(
+        `El estudiante no debe ser mayor de ${maxAge} años para ingresar al colegio.`
+      );
+    }
+  }
   if (!data.genero || !["Masculino", "Femenino"].includes(data.genero))
     errors.push("El género debe ser 'Masculino' o 'Femenino'.");
   if (!data.numero_identificacion || data.numero_identificacion.length < 8)
@@ -181,5 +203,56 @@ exports.deleteStudent = async (req, res) => {
       return res.status(409).json({ message: error.message });
     }
     res.status(500).json({ message: "Error al eliminar el estudiante." });
+  }
+};
+
+exports.getAssociatedApoderados = async (req, res) => {
+  try {
+    const apoderados = await Student.getAssociatedApoderados(req.params.id);
+    res.json(apoderados);
+  } catch (error) {
+    console.error("Error al obtener apoderados asociados:", error);
+    res
+      .status(500)
+      .json({ message: "Error al obtener lista de apoderados asociados." });
+  }
+};
+
+exports.associateApoderado = async (req, res) => {
+  const studentId = req.params.id;
+  const { apoderado_id, parentesco } = req.body;
+
+  if (!apoderado_id || !parentesco) {
+    return res
+      .status(400)
+      .json({ message: "Se requiere apoderado_id y parentesco." });
+  }
+
+  try {
+    await Student.associateApoderado(studentId, apoderado_id, parentesco);
+    res.status(201).json({ message: "Apoderado asociado exitosamente." });
+  } catch (error) {
+    if (error.message.includes("ya está asociado")) {
+      return res.status(409).json({ message: error.message });
+    }
+    res.status(500).json({ message: "Error al asociar apoderado." });
+  }
+};
+
+exports.removeApoderadoAssociation = async (req, res) => {
+  const studentId = req.params.id;
+  const { apoderadoId } = req.params;
+
+  try {
+    const success = await Student.removeApoderadoAssociation(
+      studentId,
+      apoderadoId
+    );
+    if (!success) {
+      return res.status(404).json({ message: "Asociación no encontrada." });
+    }
+    res.json({ message: "Asociación eliminada exitosamente." });
+  } catch (error) {
+    res.status(500).json({ message: "Error al eliminar asociación." });
   }
 };

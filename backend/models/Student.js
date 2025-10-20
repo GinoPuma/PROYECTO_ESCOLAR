@@ -15,7 +15,7 @@ const Student = {
     }
   },
 
-  // Busca un estudiante por DNI 
+  // Busca un estudiante por DNI
   findByDNI: async (dni) => {
     try {
       const [rows] = await pool.execute(
@@ -162,6 +162,7 @@ const Student = {
 
   remove: async (id) => {
     try {
+      // El DELETE en estudiantes automáticamente manejará el borrado en estudiante_apoderado (CASCADE)
       const [result] = await pool.execute(
         "DELETE FROM estudiantes WHERE id = ?",
         [id]
@@ -176,6 +177,47 @@ const Student = {
       }
       throw error;
     }
+  },
+
+  getAssociatedApoderados: async (studentId) => {
+    const [rows] = await pool.execute(
+      `
+            SELECT 
+                a.id, a.dni, a.primer_nombre, a.primer_apellido, a.telefono,
+                ea.parentesco
+            FROM apoderado a
+            JOIN estudiante_apoderado ea ON a.id = ea.apoderado_id
+            WHERE ea.estudiante_id = ?
+            ORDER BY a.primer_apellido
+        `,
+      [studentId]
+    );
+    return rows;
+  },
+
+  associateApoderado: async (studentId, apoderadoId, parentesco) => {
+    try {
+      await pool.execute(
+        `INSERT INTO estudiante_apoderado (estudiante_id, apoderado_id, parentesco) 
+                 VALUES (?, ?, ?)`,
+        [studentId, apoderadoId, parentesco]
+      );
+      return true;
+    } catch (error) {
+      if (error.code === "ER_DUP_ENTRY") {
+        throw new Error("El apoderado ya está asociado a este estudiante.");
+      }
+      throw error;
+    }
+  },
+
+  removeApoderadoAssociation: async (studentId, apoderadoId) => {
+    const [result] = await pool.execute(
+      `DELETE FROM estudiante_apoderado 
+             WHERE estudiante_id = ? AND apoderado_id = ?`,
+      [studentId, apoderadoId]
+    );
+    return result.affectedRows > 0;
   },
 };
 
