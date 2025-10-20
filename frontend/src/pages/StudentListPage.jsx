@@ -233,14 +233,14 @@ const StudentListPage = () => {
                         >
                           Editar
                         </Link>
-                        <button
+                        {/* <button
                           onClick={() =>
                             handleViewHistory(student.id, fullName)
                           }
                           className="text-purple-600 hover:text-purple-900 font-medium"
                         >
                           Historial
-                        </button>
+                        </button> */}
                         <button
                           onClick={() =>
                             handleDeleteStudent(

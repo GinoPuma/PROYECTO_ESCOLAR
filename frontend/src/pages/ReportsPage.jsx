@@ -14,7 +14,6 @@ const ReportsPage = () => {
     { id: "periodo", name: "Resumen por Período" },
     { id: "student", name: "Historial por Estudiante" },
     { id: "payments", name: "Histórico de Pagos" },
-    // { id: 'section', name: 'Control por Sección/Grado' }, // Futuro
   ];
 
   useEffect(() => {

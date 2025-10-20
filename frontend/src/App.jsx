@@ -21,7 +21,7 @@ import EnrollmentFormPage from "./pages/EnrollmentFormPage";
 import EnrollmentListPage from "./pages/EnrollmentListPage";
 import PaymentListPage from "./pages/PaymentListPage";
 import PaymentFormPage from "./pages/PaymentFormPage";
-/* import ReportsPage from "./pages/ReportsPage"; */
+import ReportsPage from "./pages/ReportsPage";
 
 /* 
 import PagosListPage from "./pages/PagosListPage";
@@ -200,7 +200,7 @@ function App() {
                 />
               }
             />
-            {/* <Route
+            <Route
               path="/reportes"
               element={
                 <ProtectedRoute
@@ -208,7 +208,7 @@ function App() {
                   allowedRoles={["Administrador"]}
                 />
               }
-            /> */}
+            />
 
             {/* Ruta de Configuración (Solo Admin) */}
             <Route

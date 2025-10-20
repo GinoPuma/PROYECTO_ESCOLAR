@@ -11,6 +11,8 @@ const PaymentFormPage = () => {
 
   const [summary, setSummary] = useState(null);
   const [paymentMethods, setPaymentMethods] = useState([]);
+  const [selectedCuotaPayments, setSelectedCuotaPayments] = useState([]);
+  const [showPaymentsModal, setShowPaymentsModal] = useState(false);
   const [paymentData, setPaymentData] = useState({
     cuota_id: "",
     metodo_pago_id: "",
@@ -119,17 +121,12 @@ const PaymentFormPage = () => {
     }
   };
 
-  // Generar constancia de pago en PDF
-  const generatePaymentReceipt = async (cuota) => {
-    if (!cuota.fechaPago || cuota.estadoCuota === "Pendiente") {
-      alert("No se puede generar constancia para cuotas sin pagos.");
-      return;
-    }
-
+  // Generar constancia de pago en PDF para UN pago específico
+  const generatePaymentReceipt = async (pagoId) => {
     try {
-      // Obtener detalles de los pagos de esta cuota
-      const response = await api.get(`/pagos/cuota/${cuota.cuota_id}`);
-      const pagos = response.data;
+      // Obtener datos del pago específico
+      const response = await api.get(`/pagos/pago/${pagoId}`);
+      const data = response.data;
 
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.width;
@@ -142,7 +139,7 @@ const PaymentFormPage = () => {
       doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
       doc.text(
-        summary.institucion_nombre || "Institución Educativa",
+        data.summary.institucion_nombre || "Institución Educativa",
         pageWidth / 2,
         28,
         { align: "center" }
@@ -150,15 +147,17 @@ const PaymentFormPage = () => {
 
       doc.setFontSize(9);
       doc.setFont("helvetica", "normal");
-      if (summary.institucion_direccion) {
-        doc.text(summary.institucion_direccion, pageWidth / 2, 34, {
+      if (data.summary.institucion_direccion) {
+        doc.text(data.summary.institucion_direccion, pageWidth / 2, 34, {
           align: "center",
         });
       }
-      if (summary.institucion_telefono || summary.institucion_email) {
+      if (data.summary.institucion_telefono || data.summary.institucion_email) {
         doc.text(
-          `${summary.institucion_telefono || ""} ${
-            summary.institucion_email ? "| " + summary.institucion_email : ""
+          `${data.summary.institucion_telefono || ""} ${
+            data.summary.institucion_email
+              ? "| " + data.summary.institucion_email
+              : ""
           }`,
           pageWidth / 2,
           39,
@@ -168,90 +167,81 @@ const PaymentFormPage = () => {
 
       // Línea divisoria
       doc.setDrawColor(0, 0, 0);
-      doc.line(15, 35, pageWidth - 15, 35);
+      doc.line(15, 45, pageWidth - 15, 45);
+
+      // Número de pago
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.text(`Comprobante N° ${pagoId}`, pageWidth / 2, 52, {
+        align: "center",
+      });
 
       // Información del estudiante
       doc.setFontSize(11);
       doc.setFont("helvetica", "bold");
-      doc.text("DATOS DEL ESTUDIANTE", 15, 45);
+      doc.text("DATOS DEL ESTUDIANTE", 15, 62);
 
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10);
       doc.text(
-        `Estudiante: ${summary.est_nombre} ${summary.est_apellido}`,
+        `Estudiante: ${data.summary.est_nombre} ${data.summary.est_apellido}`,
         15,
-        52
+        69
       );
-      doc.text(`DNI: ${summary.est_dni}`, 15, 58);
-      doc.text(`Periodo Académico: ${summary.periodo_nombre}`, 15, 64);
+      doc.text(`DNI: ${data.summary.est_dni}`, 15, 75);
+      doc.text(`Periodo Académico: ${data.summary.periodo_nombre}`, 15, 81);
       doc.text(
-        `Grado/Sección: ${summary.grado_nombre} - ${summary.seccion_nombre}`,
+        `Grado/Sección: ${data.summary.grado_nombre} - ${data.summary.seccion_nombre}`,
         15,
-        70
+        87
       );
-      doc.text(`Matrícula N°: ${matriculaId}`, 15, 76);
+      doc.text(`Matrícula N°: ${data.matricula_id}`, 15, 93);
 
-      // Información de la cuota
+      // Información del pago
       doc.setFont("helvetica", "bold");
-      doc.text("DETALLE DEL PAGO", 15, 88);
+      doc.text("DETALLE DEL PAGO", 15, 105);
 
       doc.setFont("helvetica", "normal");
-      doc.text(`Concepto: ${cuota.concepto}`, 15, 95);
-      doc.text(`Monto Obligatorio: S/ ${cuota.monto_obligatorio}`, 15, 101);
+      doc.text(`Concepto: ${data.cuota_concepto}`, 15, 112);
       doc.text(
-        `Fecha Límite: ${moment(cuota.fecha_limite).format("DD/MM/YYYY")}`,
+        `Monto del Pago: S/ ${parseFloat(data.monto).toFixed(2)}`,
         15,
-        107
+        118
       );
-
-      // Tabla de pagos realizados
-      doc.setFont("helvetica", "bold");
-      doc.text("PAGOS REALIZADOS", 15, 119);
-
-      const tableData = pagos.map((pago) => [
-        moment(pago.fecha_pago).format("DD/MM/YYYY HH:mm"),
-        pago.metodo_pago,
-        `S/ ${parseFloat(pago.monto).toFixed(2)}`,
-        pago.referencia_pago || "-",
-      ]);
-
-      autoTable(doc, {
-        startY: 123,
-        head: [["Fecha de Pago", "Método", "Monto", "Referencia"]],
-        body: tableData,
-        theme: "grid",
-        headStyles: { fillColor: [79, 70, 229], fontSize: 9 },
-        bodyStyles: { fontSize: 9 },
-        styles: { cellPadding: 3 },
-      });
-
-      // Totales - obtener la posición Y final de la tabla
-      let finalY = 123 + tableData.length * 10 + 20; // Estimación
-      if (doc.lastAutoTable && doc.lastAutoTable.finalY) {
-        finalY = doc.lastAutoTable.finalY + 10;
-      }
-      doc.setFont("helvetica", "bold");
-      doc.text(`Total Pagado: S/ ${cuota.montoPagado.toFixed(2)}`, 15, finalY);
+      doc.text(`Método de Pago: ${data.metodo_pago}`, 15, 124);
       doc.text(
-        `Saldo Pendiente: S/ ${cuota.saldoPendiente.toFixed(2)}`,
+        `Referencia: ${data.referencia_pago || "No especificada"}`,
         15,
-        finalY + 6
+        130
+      );
+      doc.text(
+        `Fecha de Pago: ${moment(data.fecha_pago).format("DD/MM/YYYY HH:mm")}`,
+        15,
+        136
       );
 
-      // Estado
-      doc.setFontSize(12);
-      doc.setTextColor(
-        cuota.estadoCuota === "Pagado" ? 34 : 234,
-        cuota.estadoCuota === "Pagado" ? 197 : 179,
-        cuota.estadoCuota === "Pagado" ? 94 : 8
+      // Cuadro de resumen
+      doc.setDrawColor(79, 70, 229);
+      doc.setFillColor(240, 240, 255);
+      doc.roundedRect(15, 145, pageWidth - 30, 25, 3, 3, "FD");
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.text("ESTADO DEL PAGO", pageWidth / 2, 153, { align: "center" });
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.text(`Estado: ${data.estado}`, 20, 160);
+      doc.text(
+        `Monto Total Pagado: S/ ${parseFloat(data.monto).toFixed(2)}`,
+        20,
+        166
       );
-      doc.text(`Estado: ${cuota.estadoCuota.toUpperCase()}`, 15, finalY + 16);
 
       // Pie de página
-      doc.setTextColor(0, 0, 0);
+      const footerY = doc.internal.pageSize.height - 30;
       doc.setFontSize(8);
       doc.setFont("helvetica", "italic");
-      const footerY = doc.internal.pageSize.height - 20;
       doc.text(
         `Documento generado el: ${moment().format("DD/MM/YYYY HH:mm")}`,
         pageWidth / 2,
@@ -267,13 +257,38 @@ const PaymentFormPage = () => {
 
       // Descargar PDF
       doc.save(
-        `Constancia_${cuota.concepto.replace(/\s+/g, "_")}_${
-          summary.est_apellido
+        `Constancia_Pago_${pagoId}_${
+          data.summary.est_apellido
         }_${moment().format("YYYYMMDD")}.pdf`
       );
     } catch (err) {
       console.error("Error al generar constancia:", err);
       alert("Error al generar la constancia de pago.");
+    }
+  };
+
+  // Ver pagos de una cuota específica
+  const viewCuotaPayments = async (cuotaId) => {
+    try {
+      const response = await api.get(`/pagos/cuota/${cuotaId}`);
+      setSelectedCuotaPayments(response.data);
+      setShowPaymentsModal(true);
+    } catch (err) {
+      console.error("Error al obtener pagos:", err);
+      alert("Error al cargar los pagos de la cuota.");
+    }
+  };
+
+  // Ver todos los pagos de la matrícula
+  const viewAllPayments = async () => {
+    try {
+      const response = await api.get(`/pagos/summary/${matriculaId}`);
+      // summary ya tiene todos los pagos
+      setSelectedCuotaPayments(response.data.pagos);
+      setShowPaymentsModal(true);
+    } catch (err) {
+      console.error("Error al obtener pagos de la matrícula:", err);
+      alert("Error al cargar los pagos de la matrícula.");
     }
   };
 
@@ -386,15 +401,15 @@ const PaymentFormPage = () => {
                           {c.estadoCuota}
                         </span>
                       </td>
-                      <td className="px-3 py-2">
+                      <td className="px-3 py-2 text-center" >
                         {c.montoPagado > 0 && (
                           <button
-                            onClick={() => generatePaymentReceipt(c)}
-                            className="bg-indigo-600 text-white px-3 py-1 rounded text-xs hover:bg-indigo-700 flex items-center gap-1"
-                            title="Descargar constancia"
-                          >
-                            📄 Constancia
-                          </button>
+                          onClick={() => viewAllPayments()}
+                          className="text-red-600 hover:text-red-900 font-medium transition"
+                          title="ver pagos de la matrícula"
+                        >
+                          📄
+                        </button>
                         )}
                       </td>
                     </tr>
@@ -509,6 +524,98 @@ const PaymentFormPage = () => {
           </form>
         </div>
       </div>
+
+      {/* Modal de Pagos */}
+      {showPaymentsModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[80vh] overflow-hidden">
+            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-6 text-white">
+              <div className="flex justify-between items-center">
+                <h3 className="text-2xl font-bold">Pagos Realizados</h3>
+                <button
+                  onClick={() => setShowPaymentsModal(false)}
+                  className="text-white hover:text-gray-200 text-2xl font-bold"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 overflow-y-auto max-h-[60vh]">
+              {selectedCuotaPayments.length === 0 ? (
+                <p className="text-center text-gray-500 py-8">
+                  No hay pagos registrados para esta cuota
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  {selectedCuotaPayments.map((pago) => (
+                    <div
+                      key={pago.pago_id}
+                      className="border-2 border-indigo-100 rounded-xl p-4 hover:shadow-lg transition"
+                    >
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <p className="text-sm text-gray-500">
+                            Pago #{pago.pago_id}
+                          </p>
+                          <p className="text-2xl font-bold text-indigo-600">
+                            S/ {parseFloat(pago.monto).toFixed(2)}
+                          </p>
+                        </div>
+                        <span
+                          className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                            pago.estado === "Completado"
+                              ? "bg-green-100 text-green-800"
+                              : "bg-yellow-100 text-yellow-800"
+                          }`}
+                        >
+                          {pago.estado}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 text-sm mb-4">
+                        <div>
+                          <p className="text-gray-500">Fecha de Pago:</p>
+                          <p className="font-medium">
+                            {moment(pago.fecha_pago).format("DD/MM/YYYY HH:mm")}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-gray-500">Método:</p>
+                          <p className="font-medium">{pago.metodo_pago}</p>
+                        </div>
+                        <div className="col-span-2">
+                          <p className="text-gray-500">Referencia:</p>
+                          <p className="font-medium">
+                            {pago.referencia_pago || "No especificada"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => generatePaymentReceipt(pago.pago_id)}
+                        className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-2 rounded-lg hover:from-indigo-700 hover:to-purple-700 transition flex items-center justify-center gap-2"
+                      >
+                        <span>📄</span>
+                        Descargar Constancia
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="bg-gray-50 p-4 flex justify-end">
+              <button
+                onClick={() => setShowPaymentsModal(false)}
+                className="px-6 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg font-medium transition"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

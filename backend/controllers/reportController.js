@@ -1,7 +1,7 @@
 const Report = require("../models/Report");
 const Student = require("../models/Student");
 const Payment = require("../models/Payment"); // Para obtener métodos de pago
-const AcademicConfig = require("../models/AcademicConfig"); // Para obtener periodos
+const AcademicConfig = require("../models/AcademicConfig");
 
 // Helper para agrupar el reporte detallado del estudiante
 const groupStudentReport = (rawReport) => {
@@ -35,7 +35,6 @@ const groupStudentReport = (rawReport) => {
       history[matId].cuotas[cuotaId].pagos.push({
         pago_id: row.pago_id,
         monto: pagoMonto,
-        fecha_pago: row.fecha_pago,
         referencia_pago: row.referencia_pago,
         metodo: row.metodo_pago_nombre,
       });
@@ -45,7 +44,10 @@ const groupStudentReport = (rawReport) => {
 
   return Object.values(history).map((mat) => {
     mat.cuotas = Object.values(mat.cuotas).map((cuota) => {
-      cuota.saldo_pendiente = cuota.monto_obligatorio - cuota.total_pagado;
+      cuota.saldo_pendiente = Math.max(
+        cuota.monto_obligatorio - cuota.total_pagado,
+        0
+      );
       return cuota;
     });
     return mat;
@@ -86,6 +88,12 @@ exports.getPeriodSummaryReport = async (req, res) => {
   try {
     const summary = await Report.getPeriodSummary(periodoId);
 
+    // Corregimos la deuda pendiente para que nunca sea negativa
+    summary.total_deuda = Math.max(
+      parseFloat(summary.total_obligacion) - parseFloat(summary.total_ingresos),
+      0
+    );
+
     res.json({
       ...summary,
       total_deuda: parseFloat(summary.total_deuda).toFixed(2),
@@ -100,15 +108,11 @@ exports.getPeriodSummaryReport = async (req, res) => {
   }
 };
 
-// 3. Reporte de Historial de Pagos
+// 3. Reporte de Historial de Pagos (sin fechas)
 exports.getPaymentHistoryReport = async (req, res) => {
-  const { startDate, endDate, methodId } = req.query;
+  const { methodId } = req.query;
   try {
-    const history = await Report.getPaymentHistory(
-      startDate,
-      endDate,
-      methodId
-    );
+    const history = await Report.getPaymentHistory(methodId);
     res.json(history);
   } catch (error) {
     console.error("Error generating payment history report:", error);

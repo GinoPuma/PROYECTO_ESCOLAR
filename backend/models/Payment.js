@@ -30,6 +30,32 @@ const Payment = {
     return rows;
   },
 
+  // 2B️⃣ Obtiene un pago específico por ID
+  getPaymentById: async (pagoId) => {
+    const [rows] = await pool.execute(
+      `
+      SELECT 
+        pagos.id AS pago_id,
+        pagos.matricula_id,
+        pagos.cuota_id,
+        pagos.monto,
+        pagos.referencia_pago,
+        pagos.estado,
+        pagos.created_at AS fecha_pago,
+        metodos_pago.nombre AS metodo_pago,
+        cuotas.concepto AS cuota_concepto,
+        cuotas.monto AS cuota_monto,
+        cuotas.fecha_limite AS cuota_fecha_limite
+      FROM pagos
+      LEFT JOIN metodos_pago ON pagos.metodo_pago_id = metodos_pago.id
+      LEFT JOIN cuotas ON pagos.cuota_id = cuotas.id
+      WHERE pagos.id = ?
+      `,
+      [pagoId]
+    );
+    return rows[0] || null;
+  },
+
   // 3️⃣ Obtiene el resumen financiero de una matrícula (Cuotas vs Pagos)
   getFinancialSummary: async (matriculaId) => {
     // Obtener la información de matrícula y estudiante CON DATOS DE INSTITUCIÓN

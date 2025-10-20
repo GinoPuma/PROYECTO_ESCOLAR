@@ -14,19 +14,21 @@ const calculateBalances = (summary) => {
       acc[pago.cuota_id] = {
         total: 0,
         ultimaFechaPago: null,
-        ultimaReferencia: null
+        ultimaReferencia: null,
       };
     }
-    
+
     acc[pago.cuota_id].total += parseFloat(pago.monto);
-    
+
     // Guardar la fecha y referencia del pago más reciente
-    if (!acc[pago.cuota_id].ultimaFechaPago || 
-        new Date(pago.fecha_pago) > new Date(acc[pago.cuota_id].ultimaFechaPago)) {
+    if (
+      !acc[pago.cuota_id].ultimaFechaPago ||
+      new Date(pago.fecha_pago) > new Date(acc[pago.cuota_id].ultimaFechaPago)
+    ) {
       acc[pago.cuota_id].ultimaFechaPago = pago.fecha_pago;
       acc[pago.cuota_id].ultimaReferencia = pago.referencia_pago;
     }
-    
+
     return acc;
   }, {});
 
@@ -53,7 +55,7 @@ const calculateBalances = (summary) => {
       saldoPendiente: parseFloat(saldoPendiente.toFixed(2)),
       estadoCuota,
       fechaPago: pagoInfo?.ultimaFechaPago || null,
-      referenciaPago: pagoInfo?.ultimaReferencia || null
+      referenciaPago: pagoInfo?.ultimaReferencia || null,
     };
   });
 
@@ -107,7 +109,32 @@ exports.getPaymentsByCuota = async (req, res) => {
     res.json(payments);
   } catch (error) {
     console.error("Error en getPaymentsByCuota:", error);
-    res.status(500).json({ message: "Error al obtener los pagos de la cuota." });
+    res
+      .status(500)
+      .json({ message: "Error al obtener los pagos de la cuota." });
+  }
+};
+
+// 3B️⃣ Obtener un pago específico por ID (para constancia individual)
+exports.getPaymentById = async (req, res) => {
+  const { pagoId } = req.params;
+
+  try {
+    const payment = await Payment.getPaymentById(pagoId);
+    if (!payment) {
+      return res.status(404).json({ message: "Pago no encontrado." });
+    }
+
+    // Obtener información completa de la matrícula
+    const summary = await Payment.getFinancialSummary(payment.matricula_id);
+
+    res.json({
+      ...payment,
+      summary,
+    });
+  } catch (error) {
+    console.error("Error en getPaymentById:", error);
+    res.status(500).json({ message: "Error al obtener el pago." });
   }
 };
 
@@ -159,11 +186,9 @@ exports.registerPayment = async (req, res) => {
 
     // Evitar pagos a cuotas totalmente pagadas
     if (targetCuota.estadoCuota === "Pagado") {
-      return res
-        .status(400)
-        .json({
-          message: "La cuota seleccionada ya está completamente pagada.",
-        });
+      return res.status(400).json({
+        message: "La cuota seleccionada ya está completamente pagada.",
+      });
     }
 
     // Registrar el pago

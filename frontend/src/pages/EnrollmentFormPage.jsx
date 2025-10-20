@@ -551,7 +551,7 @@ const EnrollmentFormPage = () => {
                     <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm text-gray-600">
                       <p className="flex items-center gap-2">
                         <span>ℹ️</span>
-                        Apoderado opcional
+                        Buscar Apoderado por DNI
                       </p>
                     </div>
                   )}

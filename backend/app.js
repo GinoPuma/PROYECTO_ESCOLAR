@@ -12,7 +12,7 @@ const apoderadoRoutes = require("./routes/apoderadoRoutes");
 const configRoutes = require("./routes/configRoutes");
 const enrollmentRoutes = require("./routes/enrollmentRoutes"); 
 const paymentRoutes = require("./routes/paymentRoutes");
-/* const reportRoutes = require("./routes/reportRoutes"); */
+const reportRoutes = require("./routes/reportRoutes");
 
 /* 
 const configRoutes = require("./routes/configRoutes");
@@ -39,7 +39,7 @@ app.use("/api/apoderados", apoderadoRoutes);
 app.use("/api/config", configRoutes);
 app.use("/api/enrollments", enrollmentRoutes);
 app.use("/api/pagos", paymentRoutes);
-/* app.use("/api/reports", reportRoutes); */
+app.use("/api/reports", reportRoutes);
 
 /* 
 app.use("/api/stats", statsRoutes);
