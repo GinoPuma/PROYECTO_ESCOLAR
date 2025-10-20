@@ -14,14 +14,15 @@ const Payment = {
     const [rows] = await pool.execute(
       `
       SELECT 
-        id AS pago_id, 
-        monto, 
-        referencia_pago, 
-        estado, 
+        pagos.id AS pago_id, 
+        pagos.monto, 
+        pagos.referencia_pago, 
+        pagos.estado, 
+        pagos.created_at AS fecha_pago,
         metodos_pago.nombre AS metodo_pago
       FROM pagos
       LEFT JOIN metodos_pago ON pagos.metodo_pago_id = metodos_pago.id
-      WHERE cuota_id = ?
+      WHERE pagos.cuota_id = ?
       ORDER BY pagos.id DESC
       `,
       [cuotaId]
@@ -31,7 +32,7 @@ const Payment = {
 
   // 3️⃣ Obtiene el resumen financiero de una matrícula (Cuotas vs Pagos)
   getFinancialSummary: async (matriculaId) => {
-    // Obtener la información de matrícula y estudiante
+    // Obtener la información de matrícula y estudiante CON DATOS DE INSTITUCIÓN
     const [matriculaRows] = await pool.execute(
       `
       SELECT 
@@ -48,13 +49,18 @@ const Payment = {
         a.dni AS apoderado_dni,
         p.nombre AS periodo_nombre,
         g.nombre AS grado_nombre,
-        s.nombre AS seccion_nombre
+        s.nombre AS seccion_nombre,
+        i.nombre AS institucion_nombre,
+        i.direccion AS institucion_direccion,
+        i.telefono AS institucion_telefono,
+        i.email AS institucion_email
       FROM matriculas m
       JOIN estudiantes e ON m.estudiante_id = e.id
       LEFT JOIN apoderado a ON m.apoderado_id = a.id
       JOIN periodos p ON m.periodo_id = p.id
       JOIN secciones s ON m.seccion_id = s.id
       JOIN grados g ON s.grado_id = g.id
+      LEFT JOIN institucion i ON i.id = 1
       WHERE m.id = ?
     `,
       [matriculaId]
@@ -83,7 +89,7 @@ const Payment = {
 
     summary.cuotas = cuotasRows;
 
-    // Obtener los pagos completados
+    // Obtener los pagos completados CON fecha de pago (created_at)
     const [pagosRows] = await pool.execute(
       `
       SELECT 
@@ -92,6 +98,7 @@ const Payment = {
         pagos.monto,
         pagos.referencia_pago,
         pagos.estado,
+        pagos.created_at AS fecha_pago,
         metodos_pago.nombre AS metodo_pago
       FROM pagos
       LEFT JOIN metodos_pago ON pagos.metodo_pago_id = metodos_pago.id

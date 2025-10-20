@@ -8,16 +8,33 @@ const calculateBalances = (summary) => {
   let totalObligation = 0;
   let totalPaid = 0;
 
-  // Agrupar pagos por cuota_id
+  // Agrupar pagos por cuota_id con fecha del último pago
   const paymentsByCuota = summary.pagos.reduce((acc, pago) => {
-    acc[pago.cuota_id] = (acc[pago.cuota_id] || 0) + parseFloat(pago.monto);
+    if (!acc[pago.cuota_id]) {
+      acc[pago.cuota_id] = {
+        total: 0,
+        ultimaFechaPago: null,
+        ultimaReferencia: null
+      };
+    }
+    
+    acc[pago.cuota_id].total += parseFloat(pago.monto);
+    
+    // Guardar la fecha y referencia del pago más reciente
+    if (!acc[pago.cuota_id].ultimaFechaPago || 
+        new Date(pago.fecha_pago) > new Date(acc[pago.cuota_id].ultimaFechaPago)) {
+      acc[pago.cuota_id].ultimaFechaPago = pago.fecha_pago;
+      acc[pago.cuota_id].ultimaReferencia = pago.referencia_pago;
+    }
+    
     return acc;
   }, {});
 
   // Calcular estado y saldos de cada cuota
   summary.cuotas = summary.cuotas.map((cuota) => {
     const montoObligatorio = parseFloat(cuota.monto_obligatorio);
-    const montoPagado = paymentsByCuota[cuota.cuota_id] || 0;
+    const pagoInfo = paymentsByCuota[cuota.cuota_id];
+    const montoPagado = pagoInfo?.total || 0;
     const saldoPendiente = montoObligatorio - montoPagado;
 
     totalObligation += montoObligatorio;
@@ -35,6 +52,8 @@ const calculateBalances = (summary) => {
       montoPagado: parseFloat(montoPagado.toFixed(2)),
       saldoPendiente: parseFloat(saldoPendiente.toFixed(2)),
       estadoCuota,
+      fechaPago: pagoInfo?.ultimaFechaPago || null,
+      referenciaPago: pagoInfo?.ultimaReferencia || null
     };
   });
 
@@ -79,7 +98,20 @@ exports.getPaymentMethods = async (req, res) => {
   }
 };
 
-// 3️⃣ Registrar un nuevo pago (sin fecha_pago)
+// 3️⃣ Obtener pagos de una cuota específica (para la constancia)
+exports.getPaymentsByCuota = async (req, res) => {
+  const { cuotaId } = req.params;
+
+  try {
+    const payments = await Payment.getPaymentsForCuota(cuotaId);
+    res.json(payments);
+  } catch (error) {
+    console.error("Error en getPaymentsByCuota:", error);
+    res.status(500).json({ message: "Error al obtener los pagos de la cuota." });
+  }
+};
+
+// 4️⃣ Registrar un nuevo pago (sin fecha_pago)
 exports.registerPayment = async (req, res) => {
   const { matricula_id, cuota_id, metodo_pago_id, monto, referencia_pago } =
     req.body;

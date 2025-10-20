@@ -15,7 +15,7 @@ const Student = {
     }
   },
 
-  // Busca un estudiante por DNI (numero_identificacion)
+  // Busca un estudiante por DNI 
   findByDNI: async (dni) => {
     try {
       const [rows] = await pool.execute(

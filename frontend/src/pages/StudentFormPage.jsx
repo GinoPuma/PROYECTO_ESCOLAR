@@ -131,7 +131,7 @@ const StudentFormPage = () => {
           {/* DNI */}
           <div>
             <label className="block text-sm font-medium text-gray-700">
-              DNI / Identificación (*)
+              DNI (*)
             </label>
             <input
               type="text"

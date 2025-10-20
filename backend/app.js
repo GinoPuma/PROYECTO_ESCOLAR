@@ -12,17 +12,12 @@ const apoderadoRoutes = require("./routes/apoderadoRoutes");
 const configRoutes = require("./routes/configRoutes");
 const enrollmentRoutes = require("./routes/enrollmentRoutes"); 
 const paymentRoutes = require("./routes/paymentRoutes");
+/* const reportRoutes = require("./routes/reportRoutes"); */
 
 /* 
 const configRoutes = require("./routes/configRoutes");
-const studentRoutes = require("./routes/studentRoutes");
 const statsRoutes = require("./routes/statsRoutes");
-const pagoRoutes = require("./routes/pagoRoutes");
-const tipoPagoRoutes = require("./routes/tipoPagoRoutes");
-const metodoPagoRoutes = require("./routes/metodoPagoRoutes");
-const responsableRoutes = require("./routes/responsableRoutes");
-const cuotaRoutes = require("./routes/cuotaRoutes");
-const periodoRoutes = require("./routes/periodoRoutes"); */
+const pagoRoutes = require("./routes/pagoRoutes"); */
 
 const app = express();
 
@@ -44,6 +39,8 @@ app.use("/api/apoderados", apoderadoRoutes);
 app.use("/api/config", configRoutes);
 app.use("/api/enrollments", enrollmentRoutes);
 app.use("/api/pagos", paymentRoutes);
+/* app.use("/api/reports", reportRoutes); */
+
 /* 
 app.use("/api/stats", statsRoutes);
 */

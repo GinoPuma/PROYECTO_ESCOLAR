@@ -22,14 +22,13 @@ const Layout = () => {
       { to: "/pagos", label: "Pagos", icon: "💰" },
       { to: "/estudiantes", label: "Estudiantes", icon: "🧑‍🎓" },
       { to: "/responsables", label: "Padres de Familia", icon: "👨‍👩‍👧‍👦" },
-      { to: "/estado_cuenta", label: "Estado de Cuenta", icon: "📄" }
     );
   }
 
   if (user && user.rol === "Administrador") {
     sidebarItems.push(
       { to: "/admin/users", label: "Gestión Usuarios", icon: "👥" },
-      /* { to: "/admin/reportes", label: "Reportes", icon: "📊" }, */
+  /* { to: "/admin/reportes", label: "Reportes", icon: "📊" }, */
       { to: "/configuracion", label: "Configuración", icon: "⚙️" }
     );
   }

@@ -8,7 +8,6 @@ const PaymentListPage = () => {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    // Reutilizamos el endpoint de matrículas para mostrar la lista
     fetchEnrollments();
   }, []);
 
@@ -62,7 +61,13 @@ const PaymentListPage = () => {
                   Periodo
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Grado/Sección
+                  Nivel
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Grado
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Sección
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Acción
@@ -82,7 +87,13 @@ const PaymentListPage = () => {
                     {m.periodo}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    {m.grado} / {m.seccion}
+                    {m.nivel}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    {m.grado} 
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    {m.seccion}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center text-sm space-x-3">
                     <Link

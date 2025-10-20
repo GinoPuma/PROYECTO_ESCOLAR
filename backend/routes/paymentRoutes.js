@@ -5,7 +5,6 @@ const { protect, authorize } = require("../middleware/authMiddleware");
 const router = express.Router();
 const rolesPermitidos = ["Administrador", "Secretaria"];
 
-// Obtener métodos de pago
 router.get(
   "/methods",
   protect,
@@ -19,6 +18,12 @@ router.get(
   protect,
   authorize(...rolesPermitidos),
   paymentController.getEnrollmentFinancialSummary
+);
+router.get(
+  "/cuota/:cuotaId",
+  protect,
+  authorize(...rolesPermitidos),
+  paymentController.getPaymentsByCuota
 );
 
 // Registrar pago

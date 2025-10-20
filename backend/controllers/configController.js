@@ -224,12 +224,9 @@ exports.createPeriodo = async (req, res) => {
       message: "Nombre, fecha de inicio y fecha de fin son requeridos.",
     });
   }
-  // Convertir activo a TINYINT (0 o 1)
   data.activo = data.activo ? 1 : 0;
 
   try {
-    // Lógica avanzada: Si se marca como activo, desactivar otros (Opcional, se puede hacer en el modelo)
-
     const nuevoPeriodo = await AcademicConfig.createPeriodo(data);
     res.status(201).json(nuevoPeriodo);
   } catch (error) {
@@ -304,7 +301,6 @@ const getMonthName = (dateString) => {
 exports.createCuota = async (req, res) => {
   const data = req.body;
 
-  // Necesitamos el tipo_pago_nombre (del frontend) y el periodo_id, monto, fecha_limite
   if (!data.periodo_id || !data.tipo_pago_id || !data.monto || !data.fecha_limite || !data.tipo_pago_nombre) {
     return res.status(400).json({ message: "Faltan campos obligatorios para la cuota (incluyendo tipo_pago_nombre)." });
   }
@@ -314,15 +310,12 @@ exports.createCuota = async (req, res) => {
   }
 
   try {
-    // 1. Deducir el Número de Orden (Mes)
     const date = new Date(data.fecha_limite);
     const monthNumber = date.getMonth() + 1; // getMonth() es 0-indexado
 
-    // 2. Generar Concepto si no se proporciona uno explícito
     let conceptoGenerado = data.concepto?.trim() || '';
     if (conceptoGenerado === '') {
       const monthName = getMonthName(data.fecha_limite);
-      // Ejemplo: "Mensualidad (Marzo)"
       conceptoGenerado = `${data.tipo_pago_nombre} (${monthName.charAt(0).toUpperCase() + monthName.slice(1)})`;
     }
 
