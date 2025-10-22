@@ -22,22 +22,21 @@ const PaymentFormPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [submitLoading, setSubmitLoading] = useState(false);
+  const [sendingReminder, setSendingReminder] = useState(false);
 
   const nextCuotaToPay = useMemo(() => {
     if (!summary || summary.cuotas.length === 0) return null;
 
     // Filtramos las cuotas que tienen saldo pendiente > 0
     const pendingCuotas = summary.cuotas.filter((c) => c.saldoPendiente > 0);
-
-    // Si no hay cuotas pendientes, terminamos
     if (pendingCuotas.length === 0) return null;
 
-    // Ordenamos todas las cuotas pendientes por fecha_limite ascendente (la más antigua primero)
+    // Ordenar cuotas
     pendingCuotas.sort(
       (a, b) => new Date(a.fecha_limite) - new Date(b.fecha_limite)
     );
 
-    // Identificamos las cuotas que están TOTALMENTE pendientes (las que tienen el saldo igual al monto obligatorio)
+    // Identificamos cuotas pendientes
     const fullyPendingCuotas = pendingCuotas.filter(
       (c) => c.saldoPendiente === parseFloat(c.monto_obligatorio)
     );
@@ -67,7 +66,6 @@ const PaymentFormPage = () => {
         setSummary(summaryRes.data);
         setPaymentMethods(methodsRes.data);
 
-        // LA LÓGICA DE AUTOSELECCIÓN SE MOVIÓ ABAJO para usar nextCuotaToPay
       } catch (err) {
         console.error("Error fetching payment data:", err);
         setError(
@@ -81,14 +79,12 @@ const PaymentFormPage = () => {
   }, [matriculaId]);
   useEffect(() => {
     if (summary && nextCuotaToPay) {
-      // Autoseleccionar la cuota que debe pagarse primero
       setPaymentData((prev) => ({
         ...prev,
         cuota_id: nextCuotaToPay.cuota_id,
         monto: nextCuotaToPay.saldoPendiente.toFixed(2),
       }));
     } else if (summary && summary.cuotas.length > 0) {
-      // Si no hay pendientes, seleccionar la última con monto 0.00
       setPaymentData((prev) => ({
         ...prev,
         cuota_id: summary.cuotas[summary.cuotas.length - 1].cuota_id,
@@ -149,18 +145,47 @@ const PaymentFormPage = () => {
       setSubmitLoading(false);
     }
   };
+  const handleSendReminder = async () => {
+    if (!summary.apoderado_id) {
+      alert(
+        "No se puede enviar el recordatorio: La matrícula no tiene un apoderado responsable."
+      );
+      return;
+    }
 
-  // Generar constancia de pago en PDF para UN pago específico
+    if (
+      !window.confirm(
+        "¿Está seguro de enviar el recordatorio inteligente de WhatsApp al apoderado?"
+      )
+    ) {
+      return;
+    }
+
+    setSendingReminder(true);
+    setError("");
+
+    try {
+      const response = await api.post(`/reminder/send/${matriculaId}`);
+      alert(`Recordatorio enviado: "${response.data.messageContent}"`);
+    } catch (err) {
+      setError(
+        err.response?.data?.message ||
+          "Error al enviar el recordatorio. Verifique el saldo o las credenciales de WhatsApp."
+      );
+    } finally {
+      setSendingReminder(false);
+    }
+  };
+
+  // Generar constancia de pago en PDF para un pago
   const generatePaymentReceipt = async (pagoId) => {
     try {
-      // Obtener datos del pago específico
       const response = await api.get(`/pagos/pago/${pagoId}`);
       const data = response.data;
 
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.width;
 
-      // Encabezado
       doc.setFontSize(18);
       doc.setFont("helvetica", "bold");
       doc.text("CONSTANCIA DE PAGO", pageWidth / 2, 20, { align: "center" });
@@ -194,18 +219,15 @@ const PaymentFormPage = () => {
         );
       }
 
-      // Línea divisoria
       doc.setDrawColor(0, 0, 0);
       doc.line(15, 45, pageWidth - 15, 45);
 
-      // Número de pago
       doc.setFontSize(10);
       doc.setFont("helvetica", "bold");
       doc.text(`Comprobante N° ${pagoId}`, pageWidth / 2, 52, {
         align: "center",
       });
 
-      // Información del estudiante
       doc.setFontSize(11);
       doc.setFont("helvetica", "bold");
       doc.text("DATOS DEL ESTUDIANTE", 15, 62);
@@ -251,7 +273,6 @@ const PaymentFormPage = () => {
         136
       );
 
-      // Cuadro de resumen
       doc.setDrawColor(79, 70, 229);
       doc.setFillColor(240, 240, 255);
       doc.roundedRect(15, 145, pageWidth - 30, 25, 3, 3, "FD");
@@ -269,7 +290,6 @@ const PaymentFormPage = () => {
         166
       );
 
-      // Pie de página
       const footerY = doc.internal.pageSize.height - 30;
       doc.setFontSize(8);
       doc.setFont("helvetica", "italic");
@@ -286,7 +306,6 @@ const PaymentFormPage = () => {
         { align: "center" }
       );
 
-      // Descargar PDF
       doc.save(
         `Constancia_Pago_${pagoId}_${
           data.summary.est_apellido
@@ -305,9 +324,6 @@ const PaymentFormPage = () => {
     let y = 15;
     const pageWidth = doc.internal.pageSize.width;
 
-    // --- 1. ENCABEZADO DE LA INSTITUCIÓN ---
-
-    // Nombre de la Institución
     doc.setFontSize(18);
     doc.setFont("helvetica", "bold");
     doc.text(
@@ -318,14 +334,12 @@ const PaymentFormPage = () => {
     );
     y += 8;
 
-    // Título del Documento
     doc.setFontSize(12);
     doc.text("ESTADO DE CUENTA ACADÉMICO", pageWidth / 2, y, {
       align: "center",
     });
     y += 7;
 
-    // Dirección y Contacto
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
 
@@ -339,9 +353,7 @@ const PaymentFormPage = () => {
     doc.setDrawColor(150, 150, 150);
     doc.line(15, y, pageWidth - 15, y);
     y += 7;
-    // ----------------------------------------
 
-    // --- 2. Información del Estudiante y Matrícula ---
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
     doc.text("DATOS DE LA MATRÍCULA", 15, y);
@@ -367,10 +379,9 @@ const PaymentFormPage = () => {
       ["Matrícula ID:", `#${summary.matricula_id}`],
     ];
 
-    // Usamos autoTable para la sección de información
     autoTable(doc, {
       startY: y + 5,
-      head: [], // Sin encabezado visible
+      head: [], 
       body: estData,
       theme: "plain",
       styles: { fontSize: 10, cellPadding: 1, overflow: "linebreak" },
@@ -379,7 +390,6 @@ const PaymentFormPage = () => {
 
     y = doc.lastAutoTable.finalY + 10;
 
-    // --- 3. Resumen Financiero Global ---
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
     doc.text("RESUMEN FINANCIERO TOTAL", 15, y);
@@ -403,7 +413,6 @@ const PaymentFormPage = () => {
 
     y = doc.lastAutoTable.finalY + 10;
 
-    // --- 4. Detalle de Cuotas ---
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
     doc.text("DETALLE DE PAGOS POR CUOTA", 15, y);
@@ -440,7 +449,6 @@ const PaymentFormPage = () => {
       columnStyles: { 4: { fontStyle: "bold", textColor: [255, 0, 0] } },
     });
 
-    // Pie de página
     doc.setFontSize(8);
     doc.setFont("helvetica", "italic");
     doc.text(
@@ -450,16 +458,13 @@ const PaymentFormPage = () => {
       { align: "center" }
     );
 
-    // Guardar y descargar
     const filename = `EstadoCuenta_${summary.est_apellido}_M${summary.matricula_id}.pdf`;
     doc.save(filename);
   };
 
-  // Ver todos los pagos de la matrícula
   const viewAllPayments = async () => {
     try {
       const response = await api.get(`/pagos/summary/${matriculaId}`);
-      // summary ya tiene todos los pagos
       setSelectedCuotaPayments(response.data.pagos);
       setShowPaymentsModal(true);
     } catch (err) {
@@ -499,8 +504,14 @@ const PaymentFormPage = () => {
         <span className="text-xl">⬇️</span>
         Descargar Estado de Cuenta
       </button>
+      <button
+        onClick={handleSendReminder}
+        className="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition flex items-center gap-2"
+        disabled={sendingReminder || summary?.totalPending <= 0}
+      >
+        {sendingReminder ? "Enviando..." : "Enviar Recordatorio"}
+      </button>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        {/* Resumen General */}
         <div className="lg:col-span-2 space-y-4">
           <div className="bg-blue-100 p-4 rounded-lg shadow-md border-l-4 border-blue-600">
             <h3 className="text-xl font-semibold mb-2 text-blue-800">
@@ -522,7 +533,6 @@ const PaymentFormPage = () => {
             </div>
           </div>
 
-          {/* Detalle de Cuotas */}
           <div className="bg-white p-4 rounded-lg shadow">
             <h3 className="text-xl font-semibold mb-3">Detalle de Cuotas</h3>
             <div className="overflow-x-auto">

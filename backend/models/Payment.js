@@ -58,38 +58,38 @@ const Payment = {
 
   // Obtiene el resumen financiero de una matrícula (Cuotas vs Pagos)
   getFinancialSummary: async (matriculaId) => {
-    
     const [matriculaRows] = await pool.execute(
       `
       SELECT 
-        m.id AS matricula_id,
-        m.periodo_id,
-        m.estudiante_id,
-        m.apoderado_id,
-        m.estado AS matricula_estado,
-        e.primer_nombre AS est_nombre,
-        e.primer_apellido AS est_apellido,
-        e.numero_identificacion AS est_dni,
-        a.primer_nombre AS apoderado_nombre,
-        a.primer_apellido AS apoderado_apellido,
-        a.dni AS apoderado_dni,
-        p.nombre AS periodo_nombre,
-        g.nombre AS grado_nombre,
-        s.nombre AS seccion_nombre,
-        n.nombre AS nivel_nombre,
-        i.nombre AS institucion_nombre,
-        i.direccion AS institucion_direccion,
-        i.telefono AS institucion_telefono,
-        i.email AS institucion_email
-      FROM matriculas m
-      JOIN estudiantes e ON m.estudiante_id = e.id
-      LEFT JOIN apoderado a ON m.apoderado_id = a.id
-      JOIN periodos p ON m.periodo_id = p.id
-      JOIN secciones s ON m.seccion_id = s.id
-      JOIN grados g ON s.grado_id = g.id
-      JOIN niveles_educativos n ON g.nivel_id = n.id
-      LEFT JOIN institucion i ON i.id = 1
-      WHERE m.id = ?
+            m.id AS matricula_id,
+            m.periodo_id,
+            m.estudiante_id,
+            m.apoderado_id,
+            m.estado AS matricula_estado,
+            e.primer_nombre AS est_nombre,
+            e.primer_apellido AS est_apellido,
+            e.numero_identificacion AS est_dni,
+            a.primer_nombre AS apoderado_nombre,
+            a.primer_apellido AS apoderado_apellido,
+            a.dni AS apoderado_dni,
+            a.telefono AS apoderado_telefono,
+            p.nombre AS periodo_nombre,
+            g.nombre AS grado_nombre,
+            s.nombre AS seccion_nombre,
+            n.nombre AS nivel_nombre,
+            i.nombre AS institucion_nombre,
+            i.direccion AS institucion_direccion,
+            i.telefono AS institucion_telefono,
+            i.email AS institucion_email
+        FROM matriculas m
+        JOIN estudiantes e ON m.estudiante_id = e.id
+        LEFT JOIN apoderado a ON m.apoderado_id = a.id
+        JOIN periodos p ON m.periodo_id = p.id
+        JOIN secciones s ON m.seccion_id = s.id
+        JOIN grados g ON s.grado_id = g.id
+        JOIN niveles_educativos n ON g.nivel_id = n.id
+        LEFT JOIN institucion i ON i.id = 1
+        WHERE m.id = ?
     `,
       [matriculaId]
     );

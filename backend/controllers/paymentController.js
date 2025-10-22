@@ -1,9 +1,7 @@
 const Payment = require("../models/Payment");
 const Enrollment = require("../models/Enrollment");
 
-const rolesPermitidos = ["Administrador", "Secretaria"];
-
-// 🧮 Helper para calcular saldos y estados
+// Helper para calcular saldos y estados
 const calculateBalances = (summary) => {
   let totalObligation = 0;
   let totalPaid = 0;
@@ -66,7 +64,7 @@ const calculateBalances = (summary) => {
   return summary;
 };
 
-// 1️⃣ Obtener resumen financiero de una matrícula
+// Obtener resumen financiero de una matrícula
 exports.getEnrollmentFinancialSummary = async (req, res) => {
   const { matriculaId } = req.params;
 
@@ -89,7 +87,7 @@ exports.getEnrollmentFinancialSummary = async (req, res) => {
   }
 };
 
-// 2️⃣ Obtener métodos de pago
+// Obtener métodos de pago
 exports.getPaymentMethods = async (req, res) => {
   try {
     const methods = await Payment.getPaymentMethods();
@@ -100,7 +98,7 @@ exports.getPaymentMethods = async (req, res) => {
   }
 };
 
-// 3️⃣ Obtener pagos de una cuota específica (para la constancia)
+// Obtener pagos de una cuota específica (para la constancia)
 exports.getPaymentsByCuota = async (req, res) => {
   const { cuotaId } = req.params;
 
@@ -115,7 +113,7 @@ exports.getPaymentsByCuota = async (req, res) => {
   }
 };
 
-// 3B️⃣ Obtener un pago específico por ID (para constancia individual)
+// Obtener un pago específico por ID (para constancia individual)
 exports.getPaymentById = async (req, res) => {
   const { pagoId } = req.params;
 
@@ -138,7 +136,7 @@ exports.getPaymentById = async (req, res) => {
   }
 };
 
-// 4️⃣ Registrar un nuevo pago (sin fecha_pago)
+// Registrar un nuevo pago (sin fecha_pago)
 exports.registerPayment = async (req, res) => {
   const { matricula_id, cuota_id, metodo_pago_id, monto, referencia_pago } =
     req.body;
@@ -222,3 +220,5 @@ exports.registerPayment = async (req, res) => {
     res.status(500).json({ message: "Error interno al registrar el pago." });
   }
 };
+
+exports.calculateBalances = calculateBalances; 

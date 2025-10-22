@@ -13,11 +13,7 @@ const configRoutes = require("./routes/configRoutes");
 const enrollmentRoutes = require("./routes/enrollmentRoutes"); 
 const paymentRoutes = require("./routes/paymentRoutes");
 const reportRoutes = require("./routes/reportRoutes");
-
-/* 
-const configRoutes = require("./routes/configRoutes");
-const statsRoutes = require("./routes/statsRoutes");
-const pagoRoutes = require("./routes/pagoRoutes"); */
+const aiReminderRoutes = require("./routes/aiReminderRoutes"); 
 
 const app = express();
 
@@ -40,6 +36,8 @@ app.use("/api/config", configRoutes);
 app.use("/api/enrollments", enrollmentRoutes);
 app.use("/api/pagos", paymentRoutes);
 app.use("/api/reports", reportRoutes);
+app.use("/api/reminder", aiReminderRoutes);
+
 
 /* 
 app.use("/api/stats", statsRoutes);
