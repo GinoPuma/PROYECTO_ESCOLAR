@@ -157,7 +157,7 @@ const StructureConfig = () => {
   const organizedData = organizeStructure();
 
   return (
-    <div>
+    <div className="">
       {/* MODALES DE FORMULARIO */}
       <NivelForm
         isOpen={isNivelModalOpen}

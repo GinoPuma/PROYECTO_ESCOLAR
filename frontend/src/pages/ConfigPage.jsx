@@ -3,6 +3,7 @@ import PeriodosConfig from "../components/Config/PeriodosConfig";
 import StructureConfig from "../components/Config/StructureConfig";
 import PagosConfig from "../components/Config/PagosConfig";
 import InstitutionConfig from "../components/Config/InstitutionConfig";
+import ReminderConfigPage from "../components/Config/ReminderConfigPage"; 
 
 const ConfigPage = () => {
   const [activeTab, setActiveTab] = useState("periodos");
@@ -12,6 +13,7 @@ const ConfigPage = () => {
     { id: "periodos", name: "Periodos y Cuotas" },
     { id: "estructura", name: "Estructura Educativa" },
     { id: "pagos", name: "Tipos de Pago/Métodos" },
+    { id: "recordatorios", name: "Recordatorios WhatsApp" },
   ];
 
   const renderContent = () => {
@@ -24,6 +26,8 @@ const ConfigPage = () => {
         return <StructureConfig />;
       case "pagos":
         return <PagosConfig />;
+      case "recordatorios":
+        return <ReminderConfigPage />;
       default:
         return null;
     }
@@ -36,7 +40,7 @@ const ConfigPage = () => {
       </h2>
 
       <div className="bg-white p-6 rounded-lg shadow-md">
-        <div className="border-b border-gray-200">
+        <div className="border-b border-gray-200 overflow-x-auto" >
           <nav className="-mb-px flex space-x-8" aria-label="Tabs">
             {tabs.map((tab) => (
               <button

@@ -151,7 +151,7 @@ const PeriodosConfig = () => {
     return <div className="text-center py-4">Cargando configuración...</div>;
 
   return (
-    <div>
+    <div className="overflow-x-auto">
       {/* Modal de Periodos */}
       <PeriodoForm
         isOpen={isPeriodoModalOpen}

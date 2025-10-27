@@ -15,7 +15,7 @@ const DashboardPage = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    /* if (user) {
+    if (user) {
       const fetchStats = async () => {
         try {
           const response = await api.get("/stats/stats");
@@ -38,7 +38,7 @@ const DashboardPage = () => {
       fetchStats();
     } else {
       setLoadingStats(false);
-    } */
+    }
   }, [user]);
 
   const handleViewUsersClick = () => {
@@ -74,14 +74,14 @@ const DashboardPage = () => {
                 {loadingStats ? "..." : stats.matriculasActivas}
               </p>
             </div>
-            <div className="bg-yellow-100 p-4 rounded-lg text-center shadow">
+            {/* <div className="bg-yellow-100 p-4 rounded-lg text-center shadow">
               <h3 className="text-lg font-medium text-yellow-800">
                 Pagos al Día
               </h3>
               <p className="text-3xl font-bold text-yellow-600">
                 {loadingStats ? "..." : stats.pagosDia}
               </p>
-            </div>
+            </div> */}
           </div>
 
           {error && <p className="text-center text-red-500 mb-4">{error}</p>}

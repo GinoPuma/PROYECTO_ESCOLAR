@@ -90,7 +90,7 @@ const InstitutionConfig = () => {
     );
 
   return (
-    <div className="max-w-3xl mx-auto bg-white p-6 rounded-lg shadow-md">
+    <div className="max-w-3xl mx-auto bg-white p-6 rounded-lg shadow-md overflow-x-auto">
       <h3 className="text-2xl font-semibold mb-6">Datos de la Institución</h3>
 
       {success && (

@@ -6,12 +6,12 @@ let tokenExpiry = 0;
 const getAuthToken = async () => {
   const now = Date.now();
 
-  // 1. Verificar si el token actual es válido (damos un margen de 10 minutos)
+  // Verificar si el token actual es válido (damos un margen de 10 minutos)
   if (currentToken && tokenExpiry > now + 10 * 60 * 1000) {
     return currentToken;
   }
 
-  // 2. Si no hay token o ha expirado, obtener uno nuevo
+  // Si no hay token o ha expirado, obtener uno nuevo
   console.log("[APISPERU] Token expirado o no existe. Obteniendo nuevo JWT...");
 
   const loginUrl = process.env.APISPERU_LOGIN_URL;

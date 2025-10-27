@@ -10,33 +10,46 @@ require("dotenv").config();
 // Configuración de la IA y WhatsApp
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// Helper para generar el mensaje con IA 
+// Helper para generar el mensaje con IA
 const generateAICustomMessage = async (
   behavior,
   apoderadoNombre,
+  studentName,
   pendiente,
-  cuotaConcepto
+  cuotaConcepto,
+  fechaLimite,
+  isOverdue,
+  institutionName
 ) => {
   let tone;
   if (behavior === "Moroso Frecuente") {
     tone =
-      "persuasivo, urgente y formal, enfatizando las consecuencias académicas.";
+      "persuasivo, urgente y formal, enfatizando las consecuencias académicas y la persona afectada.";
   } else if (behavior === "Moroso Ocasional") {
-    tone = "informativo pero firme, con un tono de recordatorio amigable.";
+    tone =
+      "informativo pero firme, con un tono de recordatorio amigable, y mencionando el estudiante.";
   } else {
     tone =
-      "amigable y de bajo estrés, asumiendo un olvido, pero informando claramente.";
+      "amigable y de bajo estrés, y mencionando claramente el estudiante y la cuota.";
   }
 
-  const systemPrompt = `Eres un asistente de secretaría escolar. Tu tarea es redactar un mensaje de WhatsApp claro y conciso para un apoderado sobre un pago pendiente. El tono debe ser ${tone}.`;
+  const dateStatusText = isOverdue
+    ? `IMPORTANTE: La cuota venció el ${fechaLimite}.`
+    : `La fecha límite de pago es el ${fechaLimite}.`;
 
-  const userPrompt = `Redacta el mensaje para el apoderado "${apoderadoNombre}". El concepto pendiente es "${cuotaConcepto}" y el monto es S/ ${pendiente.toFixed(
-    2
-  )}. Sugiere contactar a direccion...`;
+  const systemPrompt =
+    `Eres un asistente de secretaría escolar. Tu tarea es redactar un mensaje de WhatsApp claro y conciso para el apoderado (${apoderadoNombre}). ` +
+    `El mensaje DEBE incluir el nombre del estudiante (${studentName}) y el estado de la cuota (${dateStatusText}). El tono debe ser ${tone}.`;
+
+  const userPrompt =
+    `Redacta el mensaje para el apoderado "${apoderadoNombre}" respecto al ${studentName}. El concepto pendiente es "${cuotaConcepto}" y el monto es S/ ${pendiente.toFixed(
+      2
+    )}. ${dateStatusText} ` +
+    `Si el pago fue realizado por transeferncia que mande el comprobante por este medio para registrar el pago correspondiente o sugerir contactar a la dirección para resolver dudas. Termina con la firma: "Dirección del ${institutionName}".`;
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini", 
+      model: "gpt-4o-mini",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
@@ -48,9 +61,11 @@ const generateAICustomMessage = async (
     return response.choices[0].message.content.trim();
   } catch (e) {
     console.error("Error generando contenido IA (OpenAI):", e);
-    return `Estimado(a) ${apoderadoNombre}, le recordamos el pago pendiente de ${cuotaConcepto} por S/ ${pendiente.toFixed(
+    return `Estimado(a) ${apoderadoNombre}, le recordamos el pago pendiente de ${cuotaConcepto} (Estudiante: ${studentName}) por S/ ${pendiente.toFixed(
       2
-    )}. Por favor, contacte o apersoanrse a dirección...`;
+    )}. ${
+      isOverdue ? `Vencimiento: ${fechaLimite}.` : `Límite: ${fechaLimite}.`
+    } Por favor, contacte o apersoanrse a dirección del ${institutionName}...`;
   }
 };
 
@@ -67,7 +82,7 @@ const sendWhatsAppMessage = async (rawPhoneNumber, message) => {
 
   // Formato del número DESTINO
   let recipientPhone = rawPhoneNumber.replace(/\D/g, "").slice(-9);
-  recipientPhone = `51${recipientPhone}@s.whatsapp.net`; 
+  recipientPhone = `51${recipientPhone}@s.whatsapp.net`;
 
   // URL completa con el remitente
   const fullUrl = `${baseUrl}${senderPhone}/send/message`;
@@ -143,6 +158,18 @@ exports.sendReminder = async (req, res) => {
     );
     const cuotaRecordatorio = fullyPendingCuotas[0];
 
+    // --- 1. Determinar el estado de la cuota ---
+    const today = new Date();
+    const cuotaDate = new Date(cuotaRecordatorio.fecha_limite);
+
+    const isOverdue = cuotaDate < today;
+
+    const formattedDate = cuotaDate.toLocaleDateString("es-ES", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+
     // Convertimos el monto
     const montoPendiente = parseFloat(cuotaRecordatorio.monto_obligatorio);
     if (isNaN(montoPendiente)) {
@@ -161,7 +188,7 @@ exports.sendReminder = async (req, res) => {
       } (S/${montoPendiente.toFixed(2)})`
     );
 
-    // Determinar el comportamiento de pago 
+    // Determinar el comportamiento de pago
     const apoderadoId = summary.apoderado_id;
     if (!apoderadoId) {
       console.log("Apoderado ID faltante.");
@@ -177,6 +204,8 @@ exports.sendReminder = async (req, res) => {
 
     // Generar Mensaje Personalizado con IA
     const apoderadoNombre = summary.apoderado_nombre || "Estimado Apoderado(a)";
+    const studentName = `${summary.est_nombre} ${summary.est_apellido}`;
+    const institutionName = summary.institucion_nombre || "Colegio X";
 
     console.log(
       `Generando mensaje IA para ${apoderadoNombre} (Comportamiento: ${status.behavior})`
@@ -185,8 +214,12 @@ exports.sendReminder = async (req, res) => {
     const message = await generateAICustomMessage(
       status.behavior,
       apoderadoNombre,
+      studentName,
       montoPendiente,
-      cuotaRecordatorio.concepto
+      cuotaRecordatorio.concepto,
+      formattedDate,
+      isOverdue,
+      institutionName
     );
 
     // Enviar el mensaje por WhatsApp
@@ -200,13 +233,10 @@ exports.sendReminder = async (req, res) => {
     }
 
     console.log(
-      `Enviando a ${phoneNumber}. Mensaje: ${message.substring(
-        0,
-        50
-      )}...`
+      `Enviando a ${phoneNumber}. Mensaje: ${message.substring(0, 50)}...`
     );
 
-    // LLAMADA AL HELPER DE WHATSAPP 
+    // LLAMADA AL HELPER DE WHATSAPP
     const sent = await sendWhatsAppMessage(phoneNumber, message);
 
     console.log(`Resultado de envío: ${sent}`);
@@ -229,3 +259,6 @@ exports.sendReminder = async (req, res) => {
     });
   }
 };
+
+exports.generateAICustomMessage = generateAICustomMessage;
+exports.sendWhatsAppMessage = sendWhatsAppMessage;

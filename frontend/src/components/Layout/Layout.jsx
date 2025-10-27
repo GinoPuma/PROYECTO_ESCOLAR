@@ -1,11 +1,25 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Outlet, Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
 import logo from "../../assets/logo_divino_niño.png";
+import api from "../../api/api";
 
 const Layout = () => {
-  const { user, logout, institution, loading } = useAuth();
+  const { user, logout, loading } = useAuth();
   const navigate = useNavigate();
+  const [institution, setInstitution] = useState(null);
+
+  useEffect(() => {
+    const fetchInstitution = async () => {
+      try {
+        const response = await api.get("/config/institution");
+        setInstitution(response.data);
+      } catch (error) {
+        console.error("Error al obtener la institución:", error);
+      }
+    };
+    fetchInstitution();
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -41,11 +55,6 @@ const Layout = () => {
       <aside className="w-64 bg-white shadow-lg flex flex-col">
         <div className="p-4 border-b border-gray-200 flex flex-col items-center">
           <img src={logo} alt="Logo Institución" className="w-24 h-auto mb-2" />
-          {institution?.nombre && (
-            <h2 className="text-lg font-semibold text-gray-700 text-center truncate w-full">
-              {institution.nombre}
-            </h2>
-          )}
           {!loading && user && (
             <p className="text-sm text-gray-500 mt-1">{user.rol}</p>
           )}

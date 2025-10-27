@@ -4,12 +4,13 @@ const { protect, authorize } = require("../middleware/authMiddleware");
 
 const router = express.Router();
 const ADMIN = "Administrador";
+const SECRETARIA = "Secretaria";
 
 /* --- Estructura Educativa (Niveles, Grados, Secciones) --- */
 router.get(
   "/estructura",
   protect,
-  authorize(ADMIN),
+  authorize(ADMIN, SECRETARIA),
   configController.getStructureData
 );
 
@@ -72,7 +73,7 @@ router.delete(
 router.get(
   "/periodos",
   protect,
-  authorize(ADMIN),
+  authorize(ADMIN, SECRETARIA),
   configController.getAllPeriodos
 );
 router.post(
@@ -98,10 +99,10 @@ router.delete(
 router.get(
   "/periodos/:periodoId/cuotas",
   protect,
-  authorize(ADMIN),
+  authorize(ADMIN, SECRETARIA),
   configController.getPeriodoCuotas
 );
-router.post("/cuotas", protect, authorize(ADMIN), configController.createCuota);
+router.post("/cuotas", protect, authorize(ADMIN, SECRETARIA), configController.createCuota);
 router.put(
   "/cuotas/:id",
   protect,
@@ -119,7 +120,7 @@ router.delete(
 router.get(
   "/tipos-pago",
   protect,
-  authorize(ADMIN),
+  authorize(ADMIN, SECRETARIA),
   configController.getAllTiposPago
 );
 router.post(
@@ -145,7 +146,7 @@ router.delete(
 router.get(
   "/metodos-pago",
   protect,
-  authorize(ADMIN),
+  authorize(ADMIN, SECRETARIA),
   configController.getAllMetodosPago
 );
 router.post(
@@ -170,7 +171,7 @@ router.delete(
 router.get(
   "/institution",
   protect,
-  authorize(ADMIN),
+  authorize(ADMIN, SECRETARIA),
   configController.getInstitution
 );
 router.post(

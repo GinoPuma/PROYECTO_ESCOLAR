@@ -16,24 +16,12 @@ export const AuthProvider = ({ children }) => {
           const userResponse = await api.get("/users/me");
           setUser(userResponse.data);
 
-          /* try {
-            const institutionResponse = await api.get("/config/institution");
-            setInstitution(institutionResponse.data);
-          } catch (instError) {
-            console.warn(
-              "No se pupo obtener informacion de la institución.",
-              instError.response?.data?.message || instError.message
-            );
-            setInstitution(null);
-          } */
         } catch (error) {
           console.error("Error al inicializar autenticación:", error);
           // Si falla la obtención del usuario, limpia el estado
           setToken(null);
           localStorage.removeItem("authToken");
           setUser(null);
-          /*           setInstitution(null);
-           */
         }
       }
       setLoading(false);
@@ -47,18 +35,6 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem("authToken", response.data.token);
       setToken(response.data.token);
       setUser(response.data.user);
-
-      /* try {
-        const institutionResponse = await api.get("/config/institution");
-        setInstitution(institutionResponse.data);
-      } catch (instError) {
-        console.warn(
-          "Could not fetch institution data on login:",
-          instError.response?.data?.message || instError.message
-        );
-        setInstitution(null);
-      }
- */
       return response.data;
     } catch (error) {
       console.error("Login error:", error.response?.data || error.message);
@@ -80,8 +56,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem("authToken");
     setToken(null);
     setUser(null);
-/*     setInstitution(null);
- */  };
+  };
 
   return (
     <AuthContext.Provider

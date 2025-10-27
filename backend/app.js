@@ -14,6 +14,9 @@ const enrollmentRoutes = require("./routes/enrollmentRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
 const reportRoutes = require("./routes/reportRoutes");
 const aiReminderRoutes = require("./routes/aiReminderRoutes"); 
+const reminderConfigRoutes = require("./routes/reminderConfigRoutes");
+const statsRoutes = require("./routes/statsRoutes");
+
 
 const app = express();
 
@@ -37,11 +40,8 @@ app.use("/api/enrollments", enrollmentRoutes);
 app.use("/api/pagos", paymentRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/reminder", aiReminderRoutes);
-
-
-/* 
-app.use("/api/stats", statsRoutes);
-*/
+app.use("/api/reminder-config", reminderConfigRoutes);
+app.use("/api/stats", statsRoutes); 
 
 app.use(express.static(path.join(__dirname, "../frontend/dist")));
 app.get("*", (req, res) => {

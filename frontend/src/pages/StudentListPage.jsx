@@ -124,7 +124,7 @@ const StudentListPage = () => {
       </h2>
 
       {/* Formulario de Búsqueda de DNI */}
-      <div className="bg-white p-6 rounded-lg shadow mb-6">
+      <div className="bg-white p-6 rounded-lg shadow mb-6 overflow-x-auto">
         <form
           onSubmit={handleDniSearch}
           className="flex items-center space-x-3"

@@ -329,9 +329,6 @@ const EnrollmentListPage = () => {
             <h2 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">
               Gestión de Matrículas
             </h2>
-            <p className="text-gray-500 mt-2">
-              Total: {filteredEnrollments.length} matrícula(s)
-            </p>
           </div>
           <Link
             to="/matriculas/new"
@@ -365,7 +362,7 @@ const EnrollmentListPage = () => {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Filtro DNI */}
             <div className="lg:col-span-1">
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -437,16 +434,6 @@ const EnrollmentListPage = () => {
                   </option>
                 ))}
               </select>
-            </div>
-
-            {/* Botón de aplicar filtros (visual) */}
-            <div className="flex items-end">
-              <button
-                onClick={clearFilters}
-                className="w-full bg-gray-100 hover:bg-gray-200 py-2 px-4 rounded-lg text-gray-700 font-medium transition border-2 border-gray-200"
-              >
-                Limpiar Todo
-              </button>
             </div>
           </div>
         </div>

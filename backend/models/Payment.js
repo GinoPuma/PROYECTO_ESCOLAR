@@ -175,6 +175,45 @@ const Payment = {
       throw error;
     }
   },
+  // 5. Encuentra todas las matrículas que tienen cuotas venciendo o vencidas en una fecha específica
+  getMatriculasByCuotaDueDate: async (targetDate) => {
+    const [rows] = await pool.execute(
+      `
+            SELECT DISTINCT m.id as matricula_id
+            FROM matriculas m
+            JOIN cuotas c ON m.periodo_id = c.periodo_id
+            WHERE c.fecha_limite = ? AND m.estado = 'Activa'
+        `,
+      [targetDate]
+    );
+    return rows;
+  },
+
+  
+  /**
+   * Encuentra matrículas activas que tienen una cuota que cumple la condición de desfase (Ej: 1 día después de su vencimiento).
+   * @param {number} daysOffset - Días de diferencia con respecto al vencimiento (Ej: -1 para un día antes, +1 para un día después).
+   * @returns {Array} Lista de matrículas activas afectadas.
+   */
+  getMatriculasAffectedByRule: async (daysOffset) => {
+    // La fecha límite de la cuota debe ser: HOY - daysOffset
+    // Ejemplo: Si daysOffset = 1 (1 día después), buscamos cuotas cuya fecha límite sea AYER.
+    // Ejemplo: Si daysOffset = -1 (1 día antes), buscamos cuotas cuya fecha límite sea MAÑANA.
+
+    const [rows] = await pool.execute(
+      `
+            SELECT DISTINCT m.id AS matricula_id
+            FROM matriculas m
+            JOIN cuotas c ON m.periodo_id = c.periodo_id
+            WHERE 
+                m.estado = 'Activa' AND
+                c.fecha_limite = DATE_SUB(CURDATE(), INTERVAL ? DAY)
+        `,
+      [daysOffset]
+    );
+
+    return rows;
+  },
 };
 
 module.exports = Payment;

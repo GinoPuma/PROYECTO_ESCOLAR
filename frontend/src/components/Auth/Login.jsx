@@ -74,15 +74,15 @@ const Login = () => {
             </button>
           </div>
         </form>
-        <p className="text-center text-gray-600 text-xs mt-4">
+        {/* <p className="text-center text-gray-600 text-xs mt-4">
           ¿No tienes cuenta?{" "}
           <button
             onClick={() => navigate("/register")}
             className="text-blue-500 hover:text-blue-800"
           >
             Regístrate
-          </button>
-        </p>
+          </button> 
+        </p> */}
       </div>
     </div>
   );
