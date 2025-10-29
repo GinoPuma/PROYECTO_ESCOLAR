@@ -2,13 +2,11 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import moment from "moment";
 import { jsPDF } from "jspdf";
-import api from "../api/api"; // Asegúrate de que este import existe
-// Importación de jspdf-autotable no necesaria si no se usa directamente en el render
-// import autoTable from "jspdf-autotable";
+import api from "../api/api";
 
 const initialEnrollmentState = {
   estudiante_id: null,
-  apoderado_id: null, // Apoderado Responsable Principal
+  apoderado_id: null,
   periodo_id: null,
   seccion_id: null,
   estado: "Activa",
@@ -31,10 +29,10 @@ const EnrollmentFormPage = () => {
   const [enrollmentData, setEnrollmentData] = useState(initialEnrollmentState);
   const [studentInfo, setStudentInfo] = useState(null);
   const [apoderadoInfo, setApoderadoInfo] = useState(null);
-  const [associatedApoderados, setAssociatedApoderados] = useState([]); // NUEVO: Lista de Apoderados del Estudiante
+  const [associatedApoderados, setAssociatedApoderados] = useState([]);
 
   const [dniSearchStudent, setDniSearchStudent] = useState("");
-  const [dniSearchApoderado, setDniSearchApoderado] = useState(""); // Usado para búsqueda directa
+  const [dniSearchApoderado, setDniSearchApoderado] = useState("");
 
   const [structure, setStructure] = useState({
     niveles: [],
@@ -274,6 +272,29 @@ const EnrollmentFormPage = () => {
           }
 
           calculateCosts(data.periodo_id);
+        } else {
+          // Nueva matrícula: verificar si viene DNI por URL
+          const urlParams = new URLSearchParams(window.location.search);
+          const dniFromUrl = urlParams.get("dni");
+
+          if (dniFromUrl) {
+            setDniSearchStudent(dniFromUrl);
+            // Buscar automáticamente el estudiante
+            try {
+              const res = await api.get(`/students/dni/${dniFromUrl.trim()}`);
+              setStudentInfo(res.data);
+              setEnrollmentData((prev) => ({
+                ...prev,
+                estudiante_id: res.data.id,
+              }));
+              await fetchAssociatedApoderados(res.data.id);
+            } catch (err) {
+              console.error("Error al cargar estudiante desde URL:", err);
+              setError(
+                "No se pudo cargar el estudiante con el DNI proporcionado."
+              );
+            }
+          }
         }
       } catch (err) {
         console.error("Error al cargar data inicial:", err);
@@ -313,38 +334,24 @@ const EnrollmentFormPage = () => {
   // -------------------------------------------------------------------
 
   const handleSearchStudent = async (e) => {
-    e.preventDefault(); // CORRECCIÓN CRÍTICA: EVITAR RECARGA
+    e.preventDefault();
     if (!dniSearchStudent.trim()) return;
     setError("");
     setLoading(true);
-    setApoderadoInfo(null); // Limpiar apoderado anterior
-    setAssociatedApoderados([]); // Limpiar lista anterior
+    setApoderadoInfo(null);
+    setAssociatedApoderados([]);
 
     try {
       const res = await api.get(`/students/dni/${dniSearchStudent.trim()}`);
       setStudentInfo(res.data);
       setEnrollmentData((prev) => ({ ...prev, estudiante_id: res.data.id }));
 
-      // 1. Fetch asociados inmediatamente
       await fetchAssociatedApoderados(res.data.id);
-
-      // 2. Si solo hay uno, autoseleccionarlo como responsable principal
-      if (associatedApoderados.length === 1) {
-        const apoderado = associatedApoderados[0];
-        setApoderadoInfo(apoderado);
-        setEnrollmentData((prev) => ({ ...prev, apoderado_id: apoderado.id }));
-      }
     } catch (err) {
       setStudentInfo(null);
       setEnrollmentData((prev) => ({ ...prev, estudiante_id: null }));
       if (err.response?.status === 404) {
-        if (
-          window.confirm(
-            `Estudiante con DNI ${dniSearchStudent} no encontrado. ¿Desea registrarlo?`
-          )
-        ) {
-          navigate(`/estudiantes/new?dni=${dniSearchStudent}`);
-        }
+        window.confirm(`Estudiante con DNI ${dniSearchStudent} no encontrado.`);
       } else {
         setError("Error al buscar estudiante.");
       }
@@ -354,7 +361,7 @@ const EnrollmentFormPage = () => {
   };
 
   const handleSearchApoderado = async (e) => {
-    e.preventDefault(); // CORRECCIÓN CRÍTICA: EVITAR RECARGA
+    e.preventDefault();
     if (!dniSearchApoderado.trim()) {
       setApoderadoInfo(null);
       setEnrollmentData((prev) => ({ ...prev, apoderado_id: null }));
@@ -366,25 +373,15 @@ const EnrollmentFormPage = () => {
     try {
       const res = await api.get(`/apoderados/dni/${dniSearchApoderado.trim()}`);
 
-      // Si el apoderado no está en la lista de asociados del estudiante (si existe el estudiante)
-      if (studentInfo) {
-        // Validación opcional: ¿Está asociado el apoderado encontrado al estudiante?
-        // Aquí solo se asume que si se busca directamente, se quiere usar ese apoderado.
-      }
-
       setApoderadoInfo(res.data);
       setEnrollmentData((prev) => ({ ...prev, apoderado_id: res.data.id }));
     } catch (err) {
       setApoderadoInfo(null);
       setEnrollmentData((prev) => ({ ...prev, apoderado_id: null }));
       if (err.response?.status === 404) {
-        if (
-          window.confirm(
-            `Apoderado con DNI ${dniSearchApoderado} no encontrado. ¿Desea registrarlo?`
-          )
-        ) {
-          navigate(`/responsables/new?dni=${dniSearchApoderado}`);
-        }
+        window.confirm(
+          `Apoderado con DNI ${dniSearchApoderado} no encontrado.`
+        );
       } else {
         setError("Error al buscar apoderado.");
       }
@@ -393,11 +390,10 @@ const EnrollmentFormPage = () => {
     }
   };
 
-  // Función para seleccionar un apoderado de la lista de asociados
   const handleSelectAssociatedApoderado = (apoderado) => {
     setApoderadoInfo(apoderado);
     setEnrollmentData((prev) => ({ ...prev, apoderado_id: apoderado.id }));
-    setDniSearchApoderado(apoderado.dni); // Para que se muestre en la barra de búsqueda si volvemos a mostrarla
+    setDniSearchApoderado(apoderado.dni);
   };
 
   // --- Lógica de Submit ---
@@ -430,7 +426,6 @@ const EnrollmentFormPage = () => {
         matriculaId = response.data.enrollment.id;
         alert("Matrícula creada exitosamente.");
 
-        // Generar constancia PDF
         if (window.confirm("¿Desea generar la constancia de matrícula?")) {
           await generateEnrollmentCertificate(matriculaId);
         }
@@ -459,7 +454,7 @@ const EnrollmentFormPage = () => {
     enrollmentData.periodo_id &&
     enrollmentData.seccion_id;
 
-  const DNI_SEARCH_DISABLED = loading || (isEditing && studentInfo); // Deshabilita la búsqueda si estamos editando o ya encontramos el estudiante
+  const DNI_SEARCH_DISABLED = loading || (isEditing && studentInfo);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 p-8">
@@ -567,7 +562,6 @@ const EnrollmentFormPage = () => {
                       Seleccionar de Asociados ({associatedApoderados.length})
                     </h4>
 
-                    {/* Selector de Apoderados Asociados */}
                     <select
                       className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 transition"
                       value={apoderadoInfo?.id || ""}
@@ -579,7 +573,7 @@ const EnrollmentFormPage = () => {
                           ) || null;
                         handleSelectAssociatedApoderado(selectedApoderado);
                       }}
-                      required={!apoderadoInfo} // Requerir si no hay uno seleccionado
+                      required={!apoderadoInfo}
                     >
                       <option value="" disabled hidden>
                         -- Seleccione Apoderado --
@@ -591,36 +585,33 @@ const EnrollmentFormPage = () => {
                       ))}
                     </select>
 
-                    {/* Opción de búsqueda directa por DNI (si no hay asociados o si el usuario elige 'OTRO') */}
-                    {apoderadoInfo?.id === "OTRO" ||
-                      (associatedApoderados.length === 0 && (
-                        <div className="pt-2 border-t border-gray-200">
-                          <p className="text-xs text-gray-500 mb-1">
-                            Búsqueda Directa:
-                          </p>
-                          <div className="flex gap-2">
-                            <input
-                              type="text"
-                              placeholder="DNI Apoderado"
-                              value={dniSearchApoderado}
-                              onChange={(e) =>
-                                setDniSearchApoderado(e.target.value)
-                              }
-                              className="flex-grow px-4 py-2 border-2 border-teal-200 rounded-lg focus:ring-2 focus:ring-teal-500 transition"
-                            />
-                            <button
-                              type="button"
-                              onClick={handleSearchApoderado}
-                              className="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 disabled:opacity-50"
-                              disabled={loading}
-                            >
-                              🔍
-                            </button>
-                          </div>
+                    {associatedApoderados.length === 0 && (
+                      <div className="pt-2 border-t border-gray-200">
+                        <p className="text-xs text-gray-500 mb-1">
+                          Búsqueda Directa:
+                        </p>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            placeholder="DNI Apoderado"
+                            value={dniSearchApoderado}
+                            onChange={(e) =>
+                              setDniSearchApoderado(e.target.value)
+                            }
+                            className="flex-grow px-4 py-2 border-2 border-teal-200 rounded-lg focus:ring-2 focus:ring-teal-500 transition"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleSearchApoderado}
+                            className="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 disabled:opacity-50"
+                            disabled={loading}
+                          >
+                            🔍
+                          </button>
                         </div>
-                      ))}
+                      </div>
+                    )}
 
-                    {/* Tarjeta de Apoderado Seleccionado */}
                     {apoderadoInfo && (
                       <div className="bg-white rounded-xl p-4 shadow-sm border-2 border-green-200">
                         <div className="flex items-center gap-2 mb-2">

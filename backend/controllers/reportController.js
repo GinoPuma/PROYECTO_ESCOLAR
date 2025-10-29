@@ -88,17 +88,12 @@ exports.getPeriodSummaryReport = async (req, res) => {
   try {
     const summary = await Report.getPeriodSummary(periodoId);
 
-    // Corregimos la deuda pendiente para que nunca sea negativa
-    summary.total_deuda = Math.max(
-      parseFloat(summary.total_obligacion) - parseFloat(summary.total_ingresos),
-      0
-    );
-
     res.json({
-      ...summary,
-      total_deuda: parseFloat(summary.total_deuda).toFixed(2),
+      // Los campos ahora vienen ya calculados en Report.js
+      total_matriculados: summary.total_matriculados,
       total_ingresos: parseFloat(summary.total_ingresos).toFixed(2),
       total_obligacion: parseFloat(summary.total_obligacion).toFixed(2),
+      total_deuda: parseFloat(summary.total_deuda).toFixed(2),
     });
   } catch (error) {
     console.error("Error generating period report:", error);
@@ -133,5 +128,46 @@ exports.getReportSelectors = async (req, res) => {
   } catch (error) {
     console.error("Error fetching report selectors:", error);
     res.status(500).json({ message: "Error al cargar datos de selectores." });
+  }
+};
+
+const calculateCuotaStatus = (obligacion, pagado) => {
+  const saldo = obligacion - pagado;
+  if (saldo <= 0) return "Pagado";
+  if (pagado > 0) return "Parcial";
+  return "Pendiente";
+};
+
+exports.getObligationReport = async (req, res) => {
+  const { status } = req.query; // PENDIENTE, PARCIAL, PAGADO, TODOS
+
+  try {
+    const rawObligations = await Report.getObligationReport(status);
+
+    const filteredReport = rawObligations
+      .map((item) => {
+        const montoPagado = parseFloat(item.monto_pagado) || 0;
+        const montoObligatorio = parseFloat(item.monto_obligatorio);
+        const saldoPendiente = montoObligatorio - montoPagado;
+        const cuotaStatus = calculateCuotaStatus(montoObligatorio, montoPagado);
+
+        return {
+          ...item,
+          monto_pagado: montoPagado.toFixed(2),
+          saldo_pendiente: saldoPendiente.toFixed(2),
+          estado_cuota: cuotaStatus,
+        };
+      })
+      // Filtro final basado en el estado solicitado (PENDIENTE, PARCIAL, PAGADO)
+      .filter(
+        (item) => status === "TODOS" || !status || item.estado_cuota === status
+      );
+
+    res.json(filteredReport);
+  } catch (error) {
+    console.error("Error generating obligation report:", error);
+    res
+      .status(500)
+      .json({ message: "Error al generar el reporte de obligaciones." });
   }
 };

@@ -37,6 +37,12 @@ router.get(
   reportController.getPaymentHistoryReport
 );
 
+router.get(
+  "/obligations",
+  protect,
+  authorize(...rolesPermitidos),
+  reportController.getObligationReport
+);
 // (Aquí irían los reportes por Grado/Sección si fueran más complejos)
 
 module.exports = router;

@@ -89,9 +89,16 @@ const AdminUsersPage = () => {
   };
 
   if (loading)
-    return <div className="p-8 text-center">Cargando usuarios...</div>;
+    return (
+      <div className="p-8 text-center">
+        <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+        <p className="mt-4 text-gray-600">Cargando usuarios...</p>
+      </div>
+    );
+
   if (error && !user)
     return <div className="p-8 text-center text-red-500">{error}</div>;
+
   if (!user || user.rol !== "Administrador")
     return (
       <div className="p-8 text-center text-red-500">
@@ -100,159 +107,149 @@ const AdminUsersPage = () => {
     );
 
   return (
-    <div className="min-h-screen bg-gray-100 p-8">
-      <div className="bg-white p-8 rounded-lg shadow-lg max-w-5xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-800">
+    <div className="p-8 bg-gray-50 min-h-screen">
+      <div className="max-w-7xl mx-auto">
+        {/* Título principal */}
+        <div className="mb-8 flex justify-between items-center">
+          <h2 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-600">
             Gestión de Usuarios
           </h2>
           <Link
             to="/admin/users/new"
-            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg flex items-center"
+            className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition flex items-center gap-2"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-5 w-5"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path
-                fillRule="evenodd"
-                d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
-                clipRule="evenodd"
-              />
-            </svg>
-            Nuevo Usuario
+            ➕ Nuevo Usuario
           </Link>
         </div>
 
+        {/* Mensaje de error */}
         {error && (
-          <div
-            className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4"
-            role="alert"
-          >
-            <strong className="font-bold">¡Error!</strong>
-            <span className="block sm:inline ml-2">{error}</span>
+          <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded-lg mb-6 flex items-start gap-3">
+            <span className="text-xl">⚠️</span>
+            <div>{error}</div>
           </div>
         )}
 
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  ID
-                </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  Usuario
-                </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  Nombre Completo
-                </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  Email
-                </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  Rol
-                </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  Estado
-                </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  Acciones
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {users.map((user) => (
-                <tr key={user.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {user.id}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {user.username}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {user.primer_nombre} {user.primer_apellido}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {user.email}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {user.rol}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <span
-                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        user.activo
-                          ? "bg-green-100 text-green-800"
-                          : "bg-red-100 text-red-800"
-                      }`}
-                    >
-                      {user.activo ? "Activo" : "Inactivo"}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
-                    <div className="flex justify-center space-x-3">
-                      <Link
-                        to={`/admin/users/edit/${user.id}`}
-                        className="text-blue-600 hover:text-blue-900 font-medium"
-                      >
-                        Editar
-                      </Link>
-                      {user.activo ? (
-                        <button
-                          onClick={() =>
-                            handleDeactivateUser(user.id, user.username)
-                          }
-                          className="text-red-600 hover:text-red-900 font-medium"
-                        >
-                          Desactivar
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() =>
-                            handleActivateUser(user.id, user.username)
-                          }
-                          className="text-green-600 hover:text-green-900 font-medium"
-                        >
-                          Activar
-                        </button>
-                      )}
-                    </div>
-                  </td>
+        {/* Tabla de usuarios */}
+        <div className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gradient-to-r from-purple-600 to-pink-600">
+                <tr>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
+                    ID
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
+                    Usuario
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
+                    Nombre Completo
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
+                    Email
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
+                    Rol
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
+                    Estado
+                  </th>
+                  <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
+                    Acción
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {users.map((u, index) => (
+                  <tr
+                    key={u.id}
+                    className={`hover:bg-purple-50 transition ${
+                      index % 2 === 0 ? "bg-gray-50" : "bg-white"
+                    }`}
+                  >
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                      {u.id}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                      {u.username}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                      {u.primer_nombre} {u.primer_apellido}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                      {u.email}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                      {u.rol}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span
+                        className={`px-3 py-1 inline-flex text-xs font-semibold rounded-full ${
+                          u.activo
+                            ? "bg-green-100 text-green-800"
+                            : "bg-red-100 text-red-800"
+                        }`}
+                      >
+                        {u.activo ? "Activo" : "Inactivo"}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
+                      <div className="flex justify-center gap-3">
+                        <Link
+                          to={`/admin/users/edit/${u.id}`}
+                          className="inline-flex items-center gap-1 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white font-bold py-1.5 px-3 rounded-lg text-xs shadow transition"
+                        >
+                          ✏️ Editar
+                        </Link>
+                        {u.activo ? (
+                          <button
+                            onClick={() =>
+                              handleDeactivateUser(u.id, u.username)
+                            }
+                            className="inline-flex items-center gap-1 bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-600 hover:to-rose-600 text-white font-bold py-1.5 px-3 rounded-lg text-xs shadow transition"
+                          >
+                            🚫 Desactivar
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleActivateUser(u.id, u.username)}
+                            className="inline-flex items-center gap-1 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-bold py-1.5 px-3 rounded-lg text-xs shadow transition"
+                          >
+                            ✅ Activar
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mensaje si no hay usuarios */}
+          {users.length === 0 && !loading && (
+            <div className="p-12 text-center">
+              <div className="text-6xl mb-4">👥</div>
+              <p className="text-gray-500 text-lg">
+                No hay usuarios registrados.
+              </p>
+              <Link
+                to="/admin/users/new"
+                className="mt-4 inline-block text-purple-600 hover:text-purple-800 font-medium"
+              >
+                Registrar nuevo usuario
+              </Link>
+            </div>
+          )}
         </div>
+
+        {/* Botón de volver */}
         <div className="mt-6 text-center">
           <button
             onClick={() => navigate("/dashboard")}
-            className="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+            className="bg-gradient-to-r from-gray-500 to-gray-700 hover:from-gray-600 hover:to-gray-800 text-white font-bold py-2 px-6 rounded-lg shadow-md transition"
           >
-            Volver al Dashboard
+            ← Volver al Dashboard
           </button>
         </div>
       </div>

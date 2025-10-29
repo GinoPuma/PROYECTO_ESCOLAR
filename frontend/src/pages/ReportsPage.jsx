@@ -12,7 +12,7 @@ const ReportsPage = () => {
 
   const tabs = [
     { id: "periodo", name: "Resumen por Período" },
-    { id: "student", name: "Historial por Estudiante" },
+/*     { id: "student", name: "Historial por Estudiante" }, */
     { id: "payments", name: "Histórico de Pagos" },
   ];
 
@@ -41,8 +41,8 @@ const ReportsPage = () => {
     switch (activeTab) {
       case "periodo":
         return <ReportePeriodo periodos={selectors.periodos} />;
-      case "student":
-        return <ReporteStudent />;
+      /* case "student":
+        return <ReporteStudent />; */
       case "payments":
         return <ReporteHistoricoPagos metodosPago={selectors.metodosPago} />;
       default:

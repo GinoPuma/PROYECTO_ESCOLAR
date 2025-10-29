@@ -1,10 +1,10 @@
-  const pool = require("../config/db");
+const pool = require("../config/db");
 
-  const Report = {
-    // 1. Reporte de Historial Detallado del Estudiante
-    getStudentFullReport: async (studentId) => {
-      const [rows] = await pool.execute(
-        `
+const Report = {
+  // 1. Reporte de Historial Detallado del Estudiante
+  getStudentFullReport: async (studentId) => {
+    const [rows] = await pool.execute(
+      `
               SELECT 
                   m.id AS matricula_id, 
                   m.estado AS matricula_estado, 
@@ -31,40 +31,67 @@
               WHERE e.id = ?
               ORDER BY m.created_at DESC, c.orden
           `,
-        [studentId]
-      );
-      return rows;
-    },
+      [studentId]
+    );
+    return rows;
+  },
 
-    // 2. Reporte Resumen por Período
-    getPeriodSummary: async (periodoId) => {
-      // Obtenemos datos de matriculados y total de ingresos
-      const [rows] = await pool.execute(
-        `
-              SELECT 
-                  (SELECT COUNT(DISTINCT estudiante_id) FROM matriculas WHERE periodo_id = ?) AS total_matriculados,
-                  (SELECT SUM(p.monto) 
-                      FROM pagos p 
-                      JOIN matriculas m ON p.matricula_id = m.id 
-                      WHERE m.periodo_id = ? AND p.estado = 'Completado') AS total_ingresos,
-                  (SELECT SUM(c.monto) FROM cuotas c WHERE c.periodo_id = ?) AS total_obligacion
-          `,
-        [periodoId, periodoId, periodoId]
-      );
+  // 2. Reporte Resumen por Período
+  getPeriodSummary: async (periodoId) => {
+    // --- Paso 1: Contar matrículas activas y sumar sus obligaciones de cuotas ---
+    const [obligationRows] = await pool.execute(
+      `
+            SELECT 
+                COUNT(m.id) AS total_matriculados,
+                -- Suma de las obligaciones (Monto de la Cuota * Matrículas activas)
+                SUM(t_cuotas.monto_cuota) AS total_obligacion_calculada
+            FROM matriculas m
+            JOIN (
+                -- Subconsulta para sumar el monto total de cuotas para el periodo
+                SELECT SUM(monto) AS monto_cuota 
+                FROM cuotas 
+                WHERE periodo_id = ?
+            ) t_cuotas
+            WHERE m.periodo_id = ? AND m.estado = 'Activa';
+        `,
+      [periodoId, periodoId]
+    );
 
-      const summary = rows[0];
+    const summaryBase = obligationRows[0];
 
-      // Calculamos la deuda pendiente
-      summary.total_deuda =
-        parseFloat(summary.total_obligacion) -
-          parseFloat(summary.total_ingresos) || 0;
+    // --- Paso 2: Calcular el Total de Ingresos (Pagos Completados) ---
+    const [ingresosRow] = await pool.execute(
+      `
+            SELECT SUM(p.monto) AS total_ingresos
+            FROM pagos p 
+            JOIN matriculas m ON p.matricula_id = m.id 
+            WHERE m.periodo_id = ? AND p.estado = 'Completado';
+        `,
+      [periodoId]
+    );
 
-      return summary;
-    },
+    const totalIngresos = ingresosRow[0].total_ingresos || 0;
 
-    // 3. Histórico de Pagos (Sin fecha_pago)
-    getPaymentHistory: async (methodId) => {
-      let query = `
+    // --- Paso 3: Calcular la Deuda Pendiente ---
+    const totalObligacion = parseFloat(
+      summaryBase.total_obligacion_calculada || 0
+    );
+    const totalIngresosFloat = parseFloat(totalIngresos);
+
+    // El total de deuda es la diferencia
+    const totalDeuda = totalObligacion - totalIngresosFloat;
+
+    return {
+      total_matriculados: parseInt(summaryBase.total_matriculados || 0),
+      total_ingresos: totalIngresosFloat,
+      total_obligacion: totalObligacion,
+      total_deuda: totalDeuda,
+    };
+  },
+
+  // 3. Histórico de Pagos (Sin fecha_pago)
+  getPaymentHistory: async (methodId) => {
+    let query = `
               SELECT 
                   pa.id, 
                   pa.monto, 
@@ -80,16 +107,35 @@
               LEFT JOIN metodos_pago mt ON pa.metodo_pago_id = mt.id
               WHERE pa.estado = 'Completado'
           `;
-      const params = [];
+    const params = [];
 
-      if (methodId) {
-        query += " AND pa.metodo_pago_id = ?";
-        params.push(methodId);
-      }
+    if (methodId) {
+      query += " AND pa.metodo_pago_id = ?";
+      params.push(methodId);
+    }
 
-      const [rows] = await pool.execute(query, params);
-      return rows;
-    },
-  };
+    const [rows] = await pool.execute(query, params);
+    return rows;
+  },
+  getObligationReport: async (statusFilter) => {
+    let query = `
+            SELECT 
+                m.id AS matricula_id,
+                e.primer_nombre AS est_nombre, 
+                e.primer_apellido AS est_apellido,
+                c.concepto,
+                c.fecha_limite,
+                c.monto AS monto_obligatorio,
+                (SELECT SUM(p.monto) FROM pagos p WHERE p.cuota_id = c.id AND p.estado = 'Completado') AS monto_pagado
+            FROM cuotas c
+            JOIN matriculas m ON c.periodo_id = m.periodo_id
+            JOIN estudiantes e ON m.estudiante_id = e.id
+            ORDER BY m.id, c.fecha_limite DESC
+        `;
 
-  module.exports = Report;
+    const [rows] = await pool.execute(query);
+    return rows;
+  },
+};
+
+module.exports = Report;

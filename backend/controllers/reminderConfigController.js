@@ -10,7 +10,7 @@ const pool = require("../config/db");
 const getTargetDate = (daysOffset) => {
   const date = new Date();
   date.setDate(date.getDate() - daysOffset);
-  return date.toISOString().split("T")[0]; 
+  return date.toISOString().split("T")[0];
 };
 
 exports.getAllRules = async (req, res) => {
@@ -164,7 +164,6 @@ const executeReminderLogic = async (ruleId) => {
       }
 
       if (cuotaRecordatorio) {
-
         // 1. Obtener estado de morosidad
         const apoderadoId = summary.apoderado_id;
         if (!apoderadoId || !summary.apoderado_telefono) {
@@ -187,13 +186,21 @@ const executeReminderLogic = async (ruleId) => {
           year: "numeric",
         });
 
+        // --- CALCULAR CUOTAS ANTERIORES PENDIENTES ---
+        const countPriorFullyPending = summary.cuotas.filter((c) => {
+          const isFullyPending =
+            c.saldoPendiente === parseFloat(c.monto_obligatorio);
+          const isOlder =
+            new Date(c.fecha_limite) < new Date(cuotaRecordatorio.fecha_limite);
+          return isFullyPending && isOlder;
+        }).length;
+        // ---------------------------------------------
         // 2. Generar mensaje IA
         const montoPendiente = parseFloat(cuotaRecordatorio.monto_obligatorio);
         const apoderadoNombre =
           summary.apoderado_nombre || "Estimado Apoderado(a)";
         const studentName = `${summary.est_nombre} ${summary.est_apellido}`;
         const institutionName = summary.institucion_nombre || "Colegio X";
-
 
         const message = await aiReminderController.generateAICustomMessage(
           status.behavior,
@@ -203,7 +210,8 @@ const executeReminderLogic = async (ruleId) => {
           cuotaRecordatorio.concepto,
           formattedDate,
           isOverdueForAI,
-          institutionName
+          institutionName,
+          countPriorFullyPending
         );
 
         // 3. Enviar WhatsApp

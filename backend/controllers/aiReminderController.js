@@ -19,7 +19,8 @@ const generateAICustomMessage = async (
   cuotaConcepto,
   fechaLimite,
   isOverdue,
-  institutionName
+  institutionName,
+  countPriorCuotas
 ) => {
   let tone;
   if (behavior === "Moroso Frecuente") {
@@ -34,19 +35,27 @@ const generateAICustomMessage = async (
   }
 
   const dateStatusText = isOverdue
-    ? `IMPORTANTE: La cuota venció el ${fechaLimite}.`
-    : `La fecha límite de pago es el ${fechaLimite}.`;
+    ? `vencida el ${fechaLimite}`
+    : `con fecha límite el ${fechaLimite}`;
 
+  let priorDebtContext = "";
+  if (countPriorCuotas > 0) {
+    priorDebtContext = `ADVERTENCIA: El apoderado tiene ${countPriorCuotas} cuota(s) ANTERIORES (con fecha límite pasada) totalmente pendientes. DEBES incluir una advertencia sobre esta deuda acumulada en el mensaje.`;
+  }
   const systemPrompt =
     `Eres un asistente de secretaría escolar. Tu tarea es redactar un mensaje de WhatsApp claro y conciso para el apoderado (${apoderadoNombre}). ` +
-    `El mensaje DEBE incluir el nombre del estudiante (${studentName}) y el estado de la cuota (${dateStatusText}). El tono debe ser ${tone}.`;
+    `El mensaje DEBE incluir el nombre del estudiante (${studentName}) y el estado de la cuota (${dateStatusText}). ` +
+    priorDebtContext +
+    `El tono debe ser ${tone}.`;
 
   const userPrompt =
-    `Redacta el mensaje para el apoderado "${apoderadoNombre}" respecto al ${studentName}. El concepto pendiente es "${cuotaConcepto}" y el monto es S/ ${pendiente.toFixed(
+    `El concepto a pagar es "${cuotaConcepto}" por S/ ${pendiente.toFixed(
       2
-    )}. ${dateStatusText} ` +
-    `Si el pago fue realizado por transeferncia que mande el comprobante por este medio para registrar el pago correspondiente o sugerir contactar a la dirección para resolver dudas. Termina con la firma: "Dirección del ${institutionName}".`;
-
+    )}. ` +
+    `Redacta el mensaje final de no más de 6 líneas. ` +
+    `Sugiere apersonarse o contactar a la dirección para registrar el pago o resolver dudas. ` +
+    `Si ya realizó el pago por Transferencia o Yape, por favor envíe el comprobante por este medio para realizar el registro correspondiente. ` +
+    `Firma como: "Dirección de la ${institutionName}".`;
   try {
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
@@ -61,11 +70,9 @@ const generateAICustomMessage = async (
     return response.choices[0].message.content.trim();
   } catch (e) {
     console.error("Error generando contenido IA (OpenAI):", e);
-    return `Estimado(a) ${apoderadoNombre}, le recordamos el pago pendiente de ${cuotaConcepto} (Estudiante: ${studentName}) por S/ ${pendiente.toFixed(
+    return `Estimado(a) ${apoderadoNombre}, le recordamos el pago pendiente de ${cuotaConcepto} del estudiante ${studentName} por S/ ${pendiente.toFixed(
       2
-    )}. ${
-      isOverdue ? `Vencimiento: ${fechaLimite}.` : `Límite: ${fechaLimite}.`
-    } Por favor, contacte o apersoanrse a dirección del ${institutionName}...`;
+    )}. Usted tiene ${countPriorCuotas} deudas anteriores totalmente pendientes. Por favor, contacte o apersonarrse a dirección. Direccion de la ${institutionName}.`;
   }
 };
 
@@ -211,6 +218,17 @@ exports.sendReminder = async (req, res) => {
       `Generando mensaje IA para ${apoderadoNombre} (Comportamiento: ${status.behavior})`
     );
 
+    // --- CONTEO DE MOROSIDAD HISTÓRICA ---
+    const countPriorFullyPending = summary.cuotas.filter((c) => {
+      const isFullyPending =
+        c.saldoPendiente === parseFloat(c.monto_obligatorio);
+
+      const isOlder =
+        new Date(c.fecha_limite) < new Date(cuotaRecordatorio.fecha_limite);
+
+      return isFullyPending && isOlder;
+    }).length;
+
     const message = await generateAICustomMessage(
       status.behavior,
       apoderadoNombre,
@@ -219,7 +237,8 @@ exports.sendReminder = async (req, res) => {
       cuotaRecordatorio.concepto,
       formattedDate,
       isOverdue,
-      institutionName
+      institutionName,
+      countPriorFullyPending
     );
 
     // Enviar el mensaje por WhatsApp

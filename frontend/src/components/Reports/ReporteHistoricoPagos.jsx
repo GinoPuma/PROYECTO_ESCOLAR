@@ -1,12 +1,15 @@
 import React, { useState } from "react";
 import api from "../../api/api";
 import moment from "moment";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 
 const ReporteHistoricoPagos = ({ metodosPago }) => {
   const [filters, setFilters] = useState({
     startDate: "",
     endDate: "",
     methodId: "",
+    statusFilter: "COMPLETADO",
   });
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -19,20 +22,101 @@ const ReporteHistoricoPagos = ({ metodosPago }) => {
   const handleGenerateReport = async () => {
     setLoading(true);
     setError("");
+    setResults([]);
+
+    const { statusFilter, ...params } = filters;
+    const queryParams = new URLSearchParams(params);
+
     try {
-      const params = new URLSearchParams(filters);
-      const response = await api.get(
-        `/reports/history/payments?${params.toString()}`
-      );
+      let response;
+
+      if (statusFilter === "COMPLETADO") {
+        // Si el filtro es COMPLETO, buscamos en la tabla de PAGOS (Transacciones)
+        response = await api.get(
+          `/reports/history/payments?${queryParams.toString()}`
+        );
+      } else {
+        // Si el filtro es PENDIENTE/PARCIAL/PAGADO, buscamos en la tabla de OBLIGACIONES (Cuotas)
+        response = await api.get(`/reports/obligations?status=${statusFilter}`);
+      }
+
       setResults(response.data);
     } catch (err) {
-      setError(
-        err.response?.data?.message || "Error al obtener el historial de pagos."
-      );
+      setError(err.response?.data?.message || "Error al obtener el historial.");
       setResults([]);
     } finally {
       setLoading(false);
     }
+  };
+  const handleExportPDF = () => {
+    if (results.length === 0) {
+      alert("No hay datos para exportar.");
+      return;
+    }
+
+    const doc = new jsPDF("p", "mm", "a4");
+    const pageWidth = doc.internal.pageSize.width;
+    let y = 15;
+
+    // Título
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text("REPORTE HISTÓRICO DE INGRESOS", 15, y);
+    y += 7;
+
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Generado el: ${moment().format("DD/MM/YYYY HH:mm")}`, 15, y);
+    y += 5;
+
+    // Preparar los datos para autoTable
+    const head = [
+      [
+        "ID Pago",
+        "Estudiante",
+        "Concepto (Cuota)",
+        "Monto",
+        "Fecha Pago",
+        "Método",
+        "Referencia",
+      ],
+    ];
+
+    const body = results.map((p) => [
+      p.id,
+      `${p.est_nombre} ${p.est_apellido}`,
+      p.cuota_concepto,
+      `S/ ${parseFloat(p.monto).toFixed(2)}`,
+      moment(p.fecha_pago).format("DD/MM/YYYY"),
+      p.metodo,
+      p.referencia_pago || "-",
+    ]);
+
+    // Generar la tabla
+    autoTable(doc, {
+      startY: y + 5,
+      head: head,
+      body: body,
+      theme: "striped",
+      styles: { fontSize: 8, cellPadding: 1.5 },
+      headStyles: { fillColor: [52, 58, 64] },
+      columnStyles: { 3: { halign: "right" } }, // Alinear Monto a la derecha
+    });
+
+    // Suma total (Opcional, pero útil)
+    const totalMonto = results.reduce((sum, p) => sum + parseFloat(p.monto), 0);
+
+    y = doc.lastAutoTable.finalY + 5;
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text(
+      `Total de Ingresos Reportados: S/ ${totalMonto.toFixed(2)}`,
+      pageWidth - 15,
+      y,
+      { align: "right" }
+    );
+
+    doc.save(`Reporte_Pagos_${moment().format("YYYYMMDD")}.pdf`);
   };
 
   return (
@@ -88,6 +172,13 @@ const ReporteHistoricoPagos = ({ metodosPago }) => {
           }
         >
           {loading ? "Buscando..." : "Buscar Pagos"}
+        </button>
+        <button
+          onClick={handleExportPDF}
+          className="bg-red-600 text-white px-4 py-2 rounded disabled:opacity-50 h-fit"
+          disabled={results.length === 0}
+        >
+          Exportar PDF
         </button>
       </div>
 

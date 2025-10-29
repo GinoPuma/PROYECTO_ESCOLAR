@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../hooks/useAuth";
 import api from "../api/api";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 const DashboardPage = () => {
   const { user } = useAuth();
@@ -46,105 +46,106 @@ const DashboardPage = () => {
   };
 
   const handleQuickAction = (action) => {
-    console.log(`Ejecutando acción rápida: ${action}`);
     navigate(`/${action}`);
   };
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow-md">
-      <h2 className="text-2xl font-semibold mb-6 text-gray-800">
-        Panel de Control
-      </h2>
-      {user ? (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div className="bg-blue-100 p-4 rounded-lg text-center shadow">
-              <h3 className="text-lg font-medium text-blue-800">
-                Estudiantes Totales
-              </h3>
-              <p className="text-3xl font-bold text-blue-600">
-                {loadingStats ? "..." : stats.totalEstudiantes}
-              </p>
-            </div>
-            <div className="bg-green-100 p-4 rounded-lg text-center shadow">
-              <h3 className="text-lg font-medium text-green-800">
-                Matrículas Activas
-              </h3>
-              <p className="text-3xl font-bold text-green-600">
-                {loadingStats ? "..." : stats.matriculasActivas}
-              </p>
-            </div>
-            {/* <div className="bg-yellow-100 p-4 rounded-lg text-center shadow">
-              <h3 className="text-lg font-medium text-yellow-800">
-                Pagos al Día
-              </h3>
-              <p className="text-3xl font-bold text-yellow-600">
-                {loadingStats ? "..." : stats.pagosDia}
-              </p>
-            </div> */}
-          </div>
+    <div className="p-8 bg-gray-50 min-h-screen">
+      <div className="max-w-7xl mx-auto">
+        {/* Título principal */}
+        <h2 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-600 mb-10 text-center">
+          Panel de Control
+        </h2>
 
-          {error && <p className="text-center text-red-500 mb-4">{error}</p>}
-
-          {user.rol === "Secretaria" && (
-            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-              <h3 className="text-lg font-medium mb-3 text-gray-700">
-                Acciones Rápidas:
-              </h3>
-              <div className="flex space-x-4">
-                <button
-                  onClick={() => handleQuickAction("matriculas/new")}
-                  className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md"
-                >
-                  Nueva Matrícula
-                </button>
-                <button
-                  onClick={() => handleQuickAction("pagos")}
-                  className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md"
-                >
-                  Registrar Pago
-                </button>
+        {user ? (
+          <>
+            {/* Tarjetas de estadísticas */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 mb-10">
+              <div className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-2xl shadow-lg p-6 flex flex-col items-center justify-center">
+                <h3 className="text-lg font-semibold mb-2">
+                  Estudiantes Totales
+                </h3>
+                <p className="text-5xl font-extrabold">
+                  {loadingStats ? "..." : stats.totalEstudiantes}
+                </p>
               </div>
-            </div>
-          )}
 
-          {user.rol === "Administrador" && (
-            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mt-4">
-              <h3 className="text-lg font-medium mb-3 text-gray-700">
-                Acciones de Administración:
-              </h3>
-              <div className="flex space-x-4">
-                <button
-                  onClick={handleViewUsersClick}
-                  className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-md flex items-center"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5 mr-2"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
+              <div className="bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-2xl shadow-lg p-6 flex flex-col items-center justify-center">
+                <h3 className="text-lg font-semibold mb-2">
+                  Matrículas Activas
+                </h3>
+                <p className="text-5xl font-extrabold">
+                  {loadingStats ? "..." : stats.matriculasActivas}
+                </p>
+              </div>
+
+              {/* <div className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white rounded-2xl shadow-lg p-6 flex flex-col items-center justify-center">
+                <h3 className="text-lg font-semibold mb-2">Pagos del Día</h3>
+                <p className="text-5xl font-extrabold">
+                  {loadingStats ? "..." : stats.pagosDia}
+                </p>
+              </div> */}
+            </div>
+
+            {/* Mensaje de error */}
+            {error && (
+              <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded-lg mb-6 flex items-start gap-3">
+                <span className="text-xl">⚠️</span>
+                <div>{error}</div>
+              </div>
+            )}
+
+            {/* Sección de Acciones */}
+            {user.rol === "Secretaria" && (
+              <div className="bg-white rounded-2xl shadow-md p-6 border border-gray-100">
+                <h3 className="text-2xl font-semibold text-gray-800 mb-4">
+                  Acciones Rápidas
+                </h3>
+                <div className="flex flex-wrap gap-4">
+                  <button
+                    onClick={() => handleQuickAction("matriculas/new")}
+                    className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white font-bold py-2 px-6 rounded-lg shadow-md transition"
                   >
-                    <path
-                      fillRule="evenodd"
-                      d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                  Ver Usuarios
-                </button>
-                <button
-                  onClick={() => handleQuickAction("matriculas/new")}
-                  className="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-md"
-                >
-                  Nueva Matricula
-                </button>
+                    📝 Nueva Matrícula
+                  </button>
+                  <button
+                    onClick={() => handleQuickAction("pagos")}
+                    className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-bold py-2 px-6 rounded-lg shadow-md transition"
+                  >
+                    💵 Registrar Pago
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
-        </>
-      ) : (
-        <p>Cargando información del usuario...</p>
-      )}
+            )}
+
+            {user.rol === "Administrador" && (
+              <div className="bg-white rounded-2xl shadow-md p-6 border border-gray-100 mt-6">
+                <h3 className="text-2xl font-semibold text-gray-800 mb-4">
+                  Acciones de Administración
+                </h3>
+                <div className="flex flex-wrap gap-4">
+                  <button
+                    onClick={handleViewUsersClick}
+                    className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition flex items-center"
+                  >
+                    👥 Ver Usuarios
+                  </button>
+                  <button
+                    onClick={() => handleQuickAction("matriculas/new")}
+                    className="bg-gradient-to-r from-indigo-500 to-blue-500 hover:from-indigo-600 hover:to-blue-600 text-white font-bold py-2 px-6 rounded-lg shadow-md transition"
+                  >
+                    📝 Nueva Matrícula
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="text-center text-gray-500 text-lg">
+            Cargando información del usuario...
+          </div>
+        )}
+      </div>
     </div>
   );
 };
