@@ -7,7 +7,7 @@ const { getAuthToken } = require("../utils/apisPeruAuth");
 
 require("dotenv").config();
 
-// Configuración de la IA y WhatsApp
+// Configuración de la IA(OpenAI)
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // Helper para generar el mensaje con IA
@@ -66,7 +66,6 @@ const generateAICustomMessage = async (
       temperature: 0.7,
     });
 
-    // La respuesta de OpenAI viene en 'choices[0].message.content'
     return response.choices[0].message.content.trim();
   } catch (e) {
     console.error("Error generando contenido IA (OpenAI):", e);

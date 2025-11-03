@@ -8,6 +8,8 @@ const initialEnrollmentState = {
   estudiante_id: null,
   apoderado_id: null,
   periodo_id: null,
+  nivel_id: null,
+  grado_id: null,
   seccion_id: null,
   estado: "Activa",
 };
@@ -57,7 +59,6 @@ const EnrollmentFormPage = () => {
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.width;
 
-      // Encabezado
       doc.setFontSize(20);
       doc.setFont("helvetica", "bold");
       doc.text("CONSTANCIA DE MATRÍCULA", pageWidth / 2, 20, {
@@ -92,19 +93,16 @@ const EnrollmentFormPage = () => {
         );
       }
 
-      // Línea divisoria
       doc.setDrawColor(79, 70, 229);
       doc.setLineWidth(0.5);
       doc.line(15, 48, pageWidth - 15, 48);
 
-      // Número de matrícula
       doc.setFontSize(11);
       doc.setFont("helvetica", "bold");
       doc.text(`Matrícula N° ${matriculaId}`, pageWidth / 2, 58, {
         align: "center",
       });
 
-      // Información del estudiante
       doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
       doc.text("DATOS DEL ESTUDIANTE", 15, 70);
@@ -125,7 +123,6 @@ const EnrollmentFormPage = () => {
         92
       );
 
-      // Información del apoderado
       if (data.apoderado_nombre) {
         doc.setFont("helvetica", "bold");
         doc.text("DATOS DEL APODERADO", 15, 104);
@@ -142,7 +139,6 @@ const EnrollmentFormPage = () => {
         }
       }
 
-      // Información académica
       const academicY = data.apoderado_nombre ? 138 : 104;
       doc.setFont("helvetica", "bold");
       doc.text("INFORMACIÓN ACADÉMICA", 15, academicY);
@@ -159,7 +155,6 @@ const EnrollmentFormPage = () => {
       );
       doc.text(`Estado: ${data.estado}`, 15, academicY + 43);
 
-      // Cuadro de resumen
       const summaryY = academicY + 55;
       doc.setDrawColor(79, 70, 229);
       doc.setFillColor(240, 240, 255);
@@ -189,7 +184,6 @@ const EnrollmentFormPage = () => {
         summaryY + 24
       );
 
-      // Pie de página
       const footerY = doc.internal.pageSize.height - 30;
       doc.setFontSize(8);
       doc.setFont("helvetica", "italic");
@@ -206,7 +200,6 @@ const EnrollmentFormPage = () => {
         { align: "center" }
       );
 
-      // Línea de firma
       doc.setDrawColor(0, 0, 0);
       doc.line(
         pageWidth / 2 - 30,
@@ -220,7 +213,6 @@ const EnrollmentFormPage = () => {
         align: "center",
       });
 
-      // Descargar PDF
       doc.save(
         `Constancia_Matricula_${data.estudiante_apellido}_${moment().format(
           "YYYYMMDD"
@@ -232,7 +224,6 @@ const EnrollmentFormPage = () => {
     }
   };
 
-  // --- Carga Inicial de Data y Edición ---
   useEffect(() => {
     const fetchInitialData = async () => {
       setLoading(true);
@@ -248,10 +239,20 @@ const EnrollmentFormPage = () => {
           const enrollmentRes = await api.get(`/enrollments/${id}`);
           const data = enrollmentRes.data;
 
+          // Obtener grado para saber el nivel
+          const seccion = structureRes.data.secciones.find(
+            (s) => s.id === data.seccion_id
+          );
+          const grado = structureRes.data.grados.find(
+            (g) => g.id === seccion?.grado_id
+          );
+
           setEnrollmentData({
             estudiante_id: data.estudiante_id,
             apoderado_id: data.apoderado_id,
             periodo_id: data.periodo_id,
+            nivel_id: grado?.nivel_id || null,
+            grado_id: seccion?.grado_id || null,
             seccion_id: data.seccion_id,
             estado: data.estado,
           });
@@ -260,7 +261,6 @@ const EnrollmentFormPage = () => {
           setStudentInfo(studentRes.data);
           setDniSearchStudent(studentRes.data.numero_identificacion);
 
-          // Cargar Apoderados Asociados si estamos en edición
           await fetchAssociatedApoderados(data.estudiante_id);
 
           if (data.apoderado_id) {
@@ -273,13 +273,11 @@ const EnrollmentFormPage = () => {
 
           calculateCosts(data.periodo_id);
         } else {
-          // Nueva matrícula: verificar si viene DNI por URL
           const urlParams = new URLSearchParams(window.location.search);
           const dniFromUrl = urlParams.get("dni");
 
           if (dniFromUrl) {
             setDniSearchStudent(dniFromUrl);
-            // Buscar automáticamente el estudiante
             try {
               const res = await api.get(`/students/dni/${dniFromUrl.trim()}`);
               setStudentInfo(res.data);
@@ -306,7 +304,6 @@ const EnrollmentFormPage = () => {
     fetchInitialData();
   }, [id, isEditing]);
 
-  // --- Calcula Costos ---
   const calculateCosts = async (periodoId) => {
     try {
       const response = await api.post("/enrollments/calculate-costs", {
@@ -318,11 +315,11 @@ const EnrollmentFormPage = () => {
       setCosts({ cuotas: [], total_monto: 0, numero_cuotas: 0 });
     }
   };
+
   useEffect(() => {
     if (enrollmentData.periodo_id) calculateCosts(enrollmentData.periodo_id);
   }, [enrollmentData.periodo_id]);
 
-  // --- NUEVA LÓGICA: Obtener Apoderados Asociados al Estudiante ---
   const fetchAssociatedApoderados = async (studentId) => {
     try {
       const res = await api.get(`/students/${studentId}/apoderados`);
@@ -331,7 +328,6 @@ const EnrollmentFormPage = () => {
       setAssociatedApoderados([]);
     }
   };
-  // -------------------------------------------------------------------
 
   const handleSearchStudent = async (e) => {
     e.preventDefault();
@@ -345,7 +341,6 @@ const EnrollmentFormPage = () => {
       const res = await api.get(`/students/dni/${dniSearchStudent.trim()}`);
       setStudentInfo(res.data);
       setEnrollmentData((prev) => ({ ...prev, estudiante_id: res.data.id }));
-
       await fetchAssociatedApoderados(res.data.id);
     } catch (err) {
       setStudentInfo(null);
@@ -372,7 +367,6 @@ const EnrollmentFormPage = () => {
 
     try {
       const res = await api.get(`/apoderados/dni/${dniSearchApoderado.trim()}`);
-
       setApoderadoInfo(res.data);
       setEnrollmentData((prev) => ({ ...prev, apoderado_id: res.data.id }));
     } catch (err) {
@@ -396,7 +390,6 @@ const EnrollmentFormPage = () => {
     setDniSearchApoderado(apoderado.dni);
   };
 
-  // --- Lógica de Submit ---
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (
@@ -412,8 +405,11 @@ const EnrollmentFormPage = () => {
 
     try {
       const payload = {
-        ...enrollmentData,
+        estudiante_id: enrollmentData.estudiante_id,
         apoderado_id: enrollmentData.apoderado_id || null,
+        periodo_id: enrollmentData.periodo_id,
+        seccion_id: enrollmentData.seccion_id,
+        estado: enrollmentData.estado,
       };
 
       let matriculaId;
@@ -439,15 +435,20 @@ const EnrollmentFormPage = () => {
     }
   };
 
-  // --- Filtros ---
-  const getGradoOptions = useMemo(() => {
-    return structure.grados.map((g) => ({
-      ...g,
-      full_name: `${
-        structure.niveles.find((n) => n.id === g.nivel_id)?.nombre || "Nivel"
-      } - ${g.nombre}`,
-    }));
-  }, [structure]);
+  // Filtros en cascada
+  const availableGrados = useMemo(() => {
+    if (!enrollmentData.nivel_id) return [];
+    return structure.grados.filter(
+      (g) => g.nivel_id === enrollmentData.nivel_id
+    );
+  }, [structure.grados, enrollmentData.nivel_id]);
+
+  const availableSecciones = useMemo(() => {
+    if (!enrollmentData.grado_id) return [];
+    return structure.secciones.filter(
+      (s) => s.grado_id === enrollmentData.grado_id
+    );
+  }, [structure.secciones, enrollmentData.grado_id]);
 
   const enrollmentReady =
     enrollmentData.estudiante_id &&
@@ -458,112 +459,103 @@ const EnrollmentFormPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 p-8">
-      <div className="max-w-7xl mx-auto">
-        <div className="bg-white shadow-2xl rounded-3xl p-8 border-t-4 border-indigo-600">
-          <div className="flex items-center justify-between mb-8">
+      <div className="max-w-5xl mx-auto">
+        <div className="bg-white shadow-md rounded-lg overflow-hidden border border-indigo-100">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-4 flex items-center justify-between">
             <div>
-              <h2 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">
+              <h2 className="text-2xl font-semibold text-white">
                 {isEditing ? "Actualizar Matrícula" : "Nueva Matrícula"}
               </h2>
-              <p className="text-gray-500 mt-2">
+              <p className="text-indigo-100 text-sm">
                 Complete la información del estudiante y su matrícula
               </p>
             </div>
             <Link
               to="/matriculas"
-              className="text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-2 transition"
+              className="text-sm text-indigo-100 hover:text-white flex items-center gap-2 border border-indigo-200 px-3 py-1.5 rounded-md"
             >
-              ← Volver al Listado
+              ← Volver
             </Link>
           </div>
 
           {error && (
-            <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded-lg mb-6 flex items-start gap-3">
-              <span className="text-xl">⚠️</span>
-              <div>{error}</div>
+            <div className="mx-6 mt-5 bg-red-100 border border-red-400 text-red-700 p-3 rounded-md text-sm">
+              ⚠️ {error}
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-8">
-            <div className="grid lg:grid-cols-3 gap-6">
-              {/* BLOQUE 1: ESTUDIANTE */}
-              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 shadow-md border border-indigo-100">
-                <div className="flex items-center gap-3 mb-5">
-                  <div className="bg-indigo-600 text-white w-10 h-10 rounded-full flex items-center justify-center text-xl">
-                    🧑‍🎓
-                  </div>
-                  <h3 className="text-xl font-bold text-indigo-900">
-                    Estudiante
-                  </h3>
-                </div>
-                <div className="space-y-3">
-                  <div className="flex gap-2">
+          <form onSubmit={handleSubmit} className="p-6 space-y-8">
+            {/* SECCIÓN 1: ESTUDIANTE */}
+            <section className="border-b border-indigo-100 pb-6">
+              <h3 className="text-lg font-semibold text-indigo-800 mb-3">
+                1. Información del Estudiante
+              </h3>
+
+              <div className="space-y-4">
+                <div className="flex items-end gap-3">
+                  <div className="flex-grow">
+                    <label className="block text-sm font-medium text-indigo-700 mb-1">
+                      DNI del Estudiante *
+                    </label>
                     <input
                       type="text"
-                      placeholder="DNI del Estudiante"
+                      placeholder="Ingrese 8 dígitos"
                       value={dniSearchStudent}
                       onChange={(e) => setDniSearchStudent(e.target.value)}
-                      className="flex-grow px-4 py-2 border-2 border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                      className="w-full px-3 py-2.5 border border-indigo-300 rounded-md focus:ring-1 focus:ring-indigo-500 focus:outline-none"
                       required
                       disabled={DNI_SEARCH_DISABLED}
                     />
+                  </div>
+
+                  <div className="self-end">
                     <button
                       type="button"
                       onClick={handleSearchStudent}
-                      className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition shadow-md disabled:opacity-50"
+                      className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-4 py-2.5 rounded-md hover:opacity-90 text-sm disabled:opacity-50"
                       disabled={DNI_SEARCH_DISABLED}
                     >
-                      🔍
+                      Buscar
                     </button>
                   </div>
-
-                  {studentInfo ? (
-                    <div className="bg-white rounded-xl p-4 shadow-sm border-2 border-green-200">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-2xl">✅</span>
-                        <p className="font-bold text-gray-800">
-                          {getFullName(studentInfo)}
-                        </p>
-                      </div>
-                      <p className="text-sm text-gray-600">
-                        📋 DNI: {studentInfo.numero_identificacion}
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        🎂 F. Nac:{" "}
-                        {moment(studentInfo.fecha_nacimiento).format(
-                          "DD/MM/YYYY"
-                        )}
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800">
-                      <p className="flex items-center gap-2">
-                        <span>⚠️</span> Busque al estudiante por DNI
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* BLOQUE 2: APODERADO */}
-              <div className="bg-gradient-to-br from-teal-50 to-cyan-50 rounded-2xl p-6 shadow-md border border-teal-100">
-                <div className="flex items-center gap-3 mb-5">
-                  <div className="bg-teal-600 text-white w-10 h-10 rounded-full flex items-center justify-center text-xl">
-                    👨‍👩‍👧
-                  </div>
-                  <h3 className="text-xl font-bold text-teal-900">
-                    Apoderado (Responsable Principal)
-                  </h3>
                 </div>
 
                 {studentInfo ? (
-                  <div className="space-y-3">
-                    <h4 className="text-sm font-semibold text-gray-700">
-                      Seleccionar de Asociados ({associatedApoderados.length})
-                    </h4>
+                  <div className="bg-green-50 border border-green-300 rounded-md p-4 text-sm">
+                    <p className="font-medium text-indigo-800">
+                      {getFullName(studentInfo)} (DNI:{" "}
+                      {studentInfo.numero_identificacion})
+                    </p>
+                    <p className="text-indigo-600">
+                      F. Nacimiento:{" "}
+                      {moment(studentInfo.fecha_nacimiento).format(
+                        "DD/MM/YYYY"
+                      )}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="bg-yellow-50 border border-yellow-300 text-yellow-800 text-sm p-3 rounded-md text-center">
+                    ⚠️ Debe buscar y seleccionar un estudiante para continuar
+                  </div>
+                )}
+              </div>
+            </section>
 
+            {/* SECCIÓN 2: APODERADO */}
+            <section className="border-b border-indigo-100 pb-6">
+              <h3 className="text-lg font-semibold text-teal-700 mb-3">
+                2. Apoderado Responsable
+              </h3>
+
+              {studentInfo ? (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-indigo-700 mb-1">
+                      Apoderados Asociados ({associatedApoderados.length})
+                    </label>
                     <select
-                      className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 transition"
+                      className="w-full px-3 py-2 border border-indigo-300 rounded-md focus:ring-1 focus:ring-indigo-500"
                       value={apoderadoInfo?.id || ""}
                       onChange={(e) => {
                         const selectedId = parseInt(e.target.value);
@@ -571,225 +563,257 @@ const EnrollmentFormPage = () => {
                           associatedApoderados.find(
                             (a) => a.id === selectedId
                           ) || null;
-                        handleSelectAssociatedApoderado(selectedApoderado);
+                        if (selectedApoderado)
+                          handleSelectAssociatedApoderado(selectedApoderado);
                       }}
-                      required={!apoderadoInfo}
                     >
-                      <option value="" disabled hidden>
-                        -- Seleccione Apoderado --
+                      <option value="" disabled>
+                        -- Seleccione un apoderado --
                       </option>
                       {associatedApoderados.map((a) => (
                         <option key={a.id} value={a.id}>
-                          {getFullName(a)} ({a.parentesco})
+                          {getFullName(a)} - {a.parentesco} (DNI: {a.dni})
                         </option>
                       ))}
                     </select>
-
-                    {associatedApoderados.length === 0 && (
-                      <div className="pt-2 border-t border-gray-200">
-                        <p className="text-xs text-gray-500 mb-1">
-                          Búsqueda Directa:
-                        </p>
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            placeholder="DNI Apoderado"
-                            value={dniSearchApoderado}
-                            onChange={(e) =>
-                              setDniSearchApoderado(e.target.value)
-                            }
-                            className="flex-grow px-4 py-2 border-2 border-teal-200 rounded-lg focus:ring-2 focus:ring-teal-500 transition"
-                          />
-                          <button
-                            type="button"
-                            onClick={handleSearchApoderado}
-                            className="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 disabled:opacity-50"
-                            disabled={loading}
-                          >
-                            🔍
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {apoderadoInfo && (
-                      <div className="bg-white rounded-xl p-4 shadow-sm border-2 border-green-200">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="text-2xl">✅</span>
-                          <p className="font-bold text-gray-800">
-                            {getFullName(apoderadoInfo)}
-                          </p>
-                        </div>
-                        <p className="text-sm text-gray-600">
-                          📋 DNI: {apoderadoInfo.dni}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          📞 Tel: {apoderadoInfo.telefono}
-                        </p>
-                      </div>
-                    )}
                   </div>
-                ) : (
-                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm text-gray-600">
-                    <p>ℹ️ Debe seleccionar un estudiante primero.</p>
+
+                  {associatedApoderados.length === 0 && (
+                    <div className="text-sm text-indigo-600">
+                      No hay apoderados asociados. Busque uno:
+                      <div className="flex gap-2 mt-2">
+                        <input
+                          type="text"
+                          placeholder="DNI del Apoderado"
+                          value={dniSearchApoderado}
+                          onChange={(e) =>
+                            setDniSearchApoderado(e.target.value)
+                          }
+                          className="flex-grow px-3 py-2 border border-indigo-300 rounded-md focus:ring-1 focus:ring-indigo-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleSearchApoderado}
+                          className="bg-gradient-to-r from-teal-600 to-emerald-600 text-white px-4 py-2 rounded-md hover:opacity-90 text-sm"
+                        >
+                          Buscar
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {apoderadoInfo && (
+                    <div className="bg-emerald-50 border border-emerald-300 rounded-md p-4 text-sm">
+                      <p className="font-medium text-indigo-800">
+                        {getFullName(apoderadoInfo)} (DNI: {apoderadoInfo.dni})
+                      </p>
+                      <p className="text-indigo-600">
+                        Teléfono: {apoderadoInfo.telefono}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="bg-indigo-50 border border-indigo-200 rounded-md p-3 text-center text-indigo-600 text-sm">
+                  ℹ️ Primero debe seleccionar un estudiante
+                </div>
+              )}
+            </section>
+
+            {/* SECCIÓN 3: INFORMACIÓN ACADÉMICA */}
+            <section>
+              <h3 className="text-lg font-semibold text-green-700 mb-3">
+                3. Información Académica
+              </h3>
+
+              <div className="grid md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="block text-sm font-medium text-indigo-700 mb-1">
+                    Periodo Académico *
+                  </label>
+                  <select
+                    value={enrollmentData.periodo_id || ""}
+                    onChange={(e) =>
+                      setEnrollmentData((prev) => ({
+                        ...prev,
+                        periodo_id: parseInt(e.target.value),
+                      }))
+                    }
+                    className={`w-full px-3 py-2 border border-indigo-300 rounded-md focus:ring-1 focus:ring-indigo-500 ${
+                      enrollmentData.periodo_id
+                        ? "text-gray-900"
+                        : "text-gray-500"
+                    }`}
+                    required
+                  >
+                    <option value="" disabled>
+                      Seleccione un periodo
+                    </option>
+                    {periodos
+                      .filter((p) => p.activo === 1)
+                      .map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.nombre}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+
+                {isEditing && (
+                  <div>
+                    <label className="block text-sm font-medium text-indigo-700 mb-1">
+                      Estado de Matrícula
+                    </label>
+                    <select
+                      value={enrollmentData.estado}
+                      onChange={(e) =>
+                        setEnrollmentData((prev) => ({
+                          ...prev,
+                          estado: e.target.value,
+                        }))
+                      }
+                      className="w-full px-3 py-2 border border-indigo-300 rounded-md focus:ring-1 focus:ring-indigo-500"
+                    >
+                      <option value="Activa">Activa</option>
+                      <option value="Inactiva">Inactiva</option>
+                      <option value="Pendiente">Pendiente</option>
+                    </select>
                   </div>
                 )}
               </div>
 
-              {/* BLOQUE 3: MATRÍCULA */}
-              <div
-                className={`rounded-2xl p-6 shadow-md border-2 transition ${
-                  enrollmentReady
-                    ? "bg-gradient-to-br from-green-50 to-emerald-50 border-green-300"
-                    : "bg-gradient-to-br from-red-50 to-pink-50 border-red-200"
-                }`}
-              >
-                <div className="flex items-center gap-3 mb-5">
-                  <div
-                    className={`w-10 h-10 rounded-full flex items-center justify-center text-xl text-white ${
-                      enrollmentReady ? "bg-green-600" : "bg-red-500"
-                    }`}
+              <div className="grid md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-indigo-700 mb-1">
+                    Nivel Educativo *
+                  </label>
+                  <select
+                    value={enrollmentData.nivel_id || ""}
+                    onChange={(e) => {
+                      const nivelId = e.target.value
+                        ? parseInt(e.target.value)
+                        : null;
+                      setEnrollmentData((prev) => ({
+                        ...prev,
+                        nivel_id: nivelId,
+                        grado_id: null,
+                        seccion_id: null,
+                      }));
+                    }}
+                    className="w-full px-3 py-2 border border-indigo-300 rounded-md focus:ring-1 focus:ring-indigo-500"
+                    required
                   >
-                    📘
-                  </div>
-                  <h3
-                    className={`text-xl font-bold ${
-                      enrollmentReady ? "text-green-900" : "text-red-900"
-                    }`}
-                  >
-                    Información Académica
-                  </h3>
+                    <option value="">Seleccione nivel</option>
+                    {structure.niveles.map((n) => (
+                      <option key={n.id} value={n.id}>
+                        {n.nombre}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Periodo Académico *
-                    </label>
-                    <select
-                      name="periodo_id"
-                      value={enrollmentData.periodo_id || ""}
-                      onChange={(e) =>
-                        setEnrollmentData((prev) => ({
-                          ...prev,
-                          periodo_id: parseInt(e.target.value),
-                        }))
-                      }
-                      className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 transition"
-                      required
-                    >
-                      <option value="">Seleccione Periodo</option>
-                      {periodos
-                        .filter((p) => p.activo === 1)
-                        .map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.nombre}
-                          </option>
-                        ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Grado y Sección *
-                    </label>
-                    <select
-                      name="seccion_id"
-                      value={enrollmentData.seccion_id || ""}
-                      onChange={(e) =>
-                        setEnrollmentData((prev) => ({
-                          ...prev,
-                          seccion_id: parseInt(e.target.value),
-                        }))
-                      }
-                      className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 transition"
-                      required
-                    >
-                      <option value="">Seleccione</option>
-                      {getGradoOptions.map((grado) => (
-                        <optgroup key={grado.id} label={grado.full_name}>
-                          {structure.secciones
-                            .filter((s) => s.grado_id === grado.id)
-                            .map((seccion) => (
-                              <option key={seccion.id} value={seccion.id}>
-                                {grado.nombre} - {seccion.nombre}
-                              </option>
-                            ))}
-                        </optgroup>
-                      ))}
-                    </select>
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium text-indigo-700 mb-1">
+                    Grado *
+                  </label>
+                  <select
+                    value={enrollmentData.grado_id || ""}
+                    onChange={(e) => {
+                      const gradoId = e.target.value
+                        ? parseInt(e.target.value)
+                        : null;
+                      setEnrollmentData((prev) => ({
+                        ...prev,
+                        grado_id: gradoId,
+                        seccion_id: null,
+                      }));
+                    }}
+                    className="w-full px-3 py-2 border border-indigo-300 rounded-md focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                    required
+                    disabled={!enrollmentData.nivel_id}
+                  >
+                    <option value="">Seleccione grado</option>
+                    {availableGrados.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-                  {isEditing && (
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Estado
-                      </label>
-                      <select
-                        name="estado"
-                        value={enrollmentData.estado}
-                        onChange={(e) =>
-                          setEnrollmentData((prev) => ({
-                            ...prev,
-                            estado: e.target.value,
-                          }))
-                        }
-                        className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 transition"
-                      >
-                        <option value="Activa">Activa</option>
-                        <option value="Inactiva">Inactiva</option>
-                        <option value="Pendiente">Pendiente</option>
-                      </select>
-                    </div>
-                  )}
-
-                  {enrollmentData.periodo_id && (
-                    <div className="mt-4 p-4 bg-white rounded-xl border-2 border-green-200 shadow-sm">
-                      <p className="font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                        <span className="text-xl">💰</span> Costos del Periodo:
-                      </p>
-                      <div className="space-y-1 text-sm">
-                        <p className="flex justify-between">
-                          <span className="text-gray-600">Total Cuotas:</span>
-                          <span className="font-bold text-green-700">
-                            S/ {costs.total_monto.toFixed(2)}
-                          </span>
-                        </p>
-                        <p className="flex justify-between">
-                          <span className="text-gray-600">N° de Cuotas:</span>
-                          <span className="font-bold">
-                            {costs.numero_cuotas}
-                          </span>
-                        </p>
-                      </div>
-                    </div>
-                  )}
+                <div>
+                  <label className="block text-sm font-medium text-indigo-700 mb-1">
+                    Sección *
+                  </label>
+                  <select
+                    value={enrollmentData.seccion_id || ""}
+                    onChange={(e) =>
+                      setEnrollmentData((prev) => ({
+                        ...prev,
+                        seccion_id: e.target.value
+                          ? parseInt(e.target.value)
+                          : null,
+                      }))
+                    }
+                    className="w-full px-3 py-2 border border-indigo-300 rounded-md focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                    required
+                    disabled={!enrollmentData.grado_id}
+                  >
+                    <option value="">Seleccione sección</option>
+                    {availableSecciones.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.nombre}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
-            </div>
 
-            {/* BOTÓN SUBMIT */}
-            <div className="pt-6 border-t-2 border-gray-200 flex justify-end gap-4">
+              {enrollmentData.periodo_id && (
+                <div className="mt-5 bg-emerald-50 border border-emerald-300 rounded-md p-4 text-sm">
+                  <div className="flex justify-between">
+                    <div>
+                      <p className="font-medium text-green-700">
+                        Resumen Financiero
+                      </p>
+                      <p className="text-green-600">
+                        Costos asociados al periodo académico
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-green-600 text-sm">Monto Total</p>
+                      <p className="text-lg font-semibold text-green-700">
+                        S/ {costs.total_monto.toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="mt-2 text-green-700">
+                    <span className="font-semibold">N° Cuotas:</span>{" "}
+                    {costs.numero_cuotas}
+                  </p>
+                </div>
+              )}
+            </section>
+
+            {/* BOTONES DE ACCIÓN */}
+            <div className="pt-4 border-t border-indigo-100 flex justify-end gap-3">
               <button
                 type="button"
                 onClick={() => navigate("/matriculas")}
-                className="px-6 py-3 border-2 border-gray-300 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 transition"
+                className="px-5 py-2 border border-indigo-200 text-indigo-700 rounded-md hover:bg-indigo-50 text-sm"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
                 disabled={loading || !enrollmentReady}
-                className="px-8 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-bold rounded-xl hover:from-green-700 hover:to-emerald-700 transition shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="px-6 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-md hover:opacity-90 text-sm font-medium disabled:opacity-50"
               >
-                {loading ? (
-                  <>
-                    <span className="animate-spin">⏳</span>Procesando...
-                  </>
-                ) : (
-                  <>
-                    {isEditing ? "Actualizar Matrícula" : "Confirmar Matrícula"}
-                  </>
-                )}
+                {loading
+                  ? "Procesando..."
+                  : isEditing
+                  ? "Actualizar Matrícula"
+                  : "Confirmar Matrícula"}
               </button>
             </div>
           </form>
@@ -798,5 +822,4 @@ const EnrollmentFormPage = () => {
     </div>
   );
 };
-
 export default EnrollmentFormPage;
